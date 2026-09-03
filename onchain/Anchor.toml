@@ -1,0 +1,22 @@
+skip_local_validator = true
+
+[toolchain]
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+alloy_curve = "9brEDkea42QTp3dGT7jMWLE7pgnttHo5ZmyWDDPkzrbb"
+
+[programs.devnet]
+alloy_curve = "9brEDkea42QTp3dGT7jMWLE7pgnttHo5ZmyWDDPkzrbb"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "cargo test"
+
+[hooks]

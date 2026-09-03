@@ -1,0 +1,13 @@
+.anchor
+.DS_Store
+target
+**/*.rs.bk
+node_modules
+test-ledger
+.yarn
+.surfpool
+
+# Treasury signer keypair — public address is a program constant (see TREASURY_ADMIN in
+# lib.rs), but the private key must never enter this repo. Used locally as ANCHOR_WALLET to
+# sign the one-time initialize_treasury_config call.
+treasury-wallet.json
