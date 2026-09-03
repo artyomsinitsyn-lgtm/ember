@@ -36,6 +36,19 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local simulated ledger + user uploads
+/data
+/public/uploads/*
+!/public/uploads/.gitkeep
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Treasury signer keypair — never commit the private key (public address lives in
+# onchain/programs/alloy_curve/src/lib.rs as TREASURY_ADMIN).
+treasury-wallet.json
+
+# ad-hoc dev/QA scratch — not source, safe to regenerate
+/.light_qa_shots
+*_tmp.py
