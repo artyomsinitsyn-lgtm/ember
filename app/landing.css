@@ -1,0 +1,997 @@
+/* Alloy design system — imported once, globally, from app/layout.tsx (previously landing-only,
+   now used by every page: the marketing home page and the whole app dashboard share one look).
+   The custom cursor's own keyframes (al-ring, al-shard, al-shake) and cursor:none rules live in
+   globals.css instead, since CursorFx runs site-wide. */
+
+@keyframes al-marq {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes al-sheen {
+  from { background-position: -140% 0; }
+  to { background-position: 240% 0; }
+}
+@keyframes al-spin {
+  from { transform: rotate(0); }
+  to { transform: rotate(360deg); }
+}
+@keyframes al-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+.alloy-page, .alloy-page * { box-sizing: border-box; }
+.alloy-page {
+  position: relative;
+  min-height: 100vh;
+  background:
+    radial-gradient(1100px 620px at 72% -10%, #2b333c 0%, rgba(43, 51, 60, 0) 62%),
+    radial-gradient(760px 520px at 8% 8%, #1a2027 0%, rgba(26, 32, 39, 0) 60%),
+    #080b0e;
+  color: #e8eef4;
+  font-family: var(--alloy-body), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.alloy-page a { text-decoration: none; color: inherit; }
+.alloy-page button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.alloy-noise-a {
+  position: fixed; inset: 0; pointer-events: none; opacity: 0.5; z-index: 0;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.028) 0 1px, rgba(0, 0, 0, 0) 1px 3px);
+}
+.alloy-noise-b {
+  position: fixed; inset: 0; pointer-events: none; opacity: 0.35; z-index: 0;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.02) 0 1px, rgba(0, 0, 0, 0) 1px 4px);
+}
+
+/* ---------- Header / nav ---------- */
+.alloy-header {
+  /* No backdrop-filter here on purpose: this header is sticky above a marquee ticker that
+     never stops animating, and every other page has continuous CSS animations too (hero
+     spin, sheen sweeps). A blurred backdrop has to resample everything scrolling underneath
+     it every single frame — that's what was making the custom cursor's rAF trail stutter,
+     not the cursor code itself. A solid near-opaque background reads just as clean. */
+  position: sticky; top: 0; z-index: 30; display: flex; flex-wrap: wrap; align-items: center;
+  column-gap: 22px; row-gap: 12px; padding: 16px 40px; border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  background: #0a0d10;
+}
+/* The mark: a brushed-chrome square with a diamond punched out of it, cool-tinted to match
+   the site's blue ambient-glow identity rather than plain silver. A single light sweep
+   drifts across the metal on a slow loop (::before, painted under the diamond cutout so the
+   hole itself stays crisply dark) — the same "light moving across a real material" the About
+   page's design-philosophy section claims, applied to the one element that's on every page. */
+.alloy-logo-mark {
+  width: 34px; height: 34px; border-radius: 9px; position: relative; flex: none; overflow: hidden;
+  background: linear-gradient(150deg, #eef3f9 0%, #cddaea 16%, #8894a6 38%, #b7cbe2 52%, #56616f 68%, #a9c2de 84%, #e9eef3 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.75) inset, 0 5px 12px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(120, 160, 220, 0.1);
+}
+.alloy-logo-mark::before {
+  content: ""; position: absolute; inset: -50%; pointer-events: none; mix-blend-mode: screen;
+  background: linear-gradient(115deg, transparent 36%, rgba(210, 230, 255, 0.9) 50%, transparent 64%);
+  background-size: 280% 280%;
+  animation: al-mark-shine 7.5s ease-in-out infinite;
+}
+.alloy-logo-mark::after {
+  content: ""; position: absolute; inset: 9px; border-radius: 3px; background: #0a0e12; transform: rotate(45deg);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.75), inset 0 -1px 0 rgba(255, 255, 255, 0.06), 0 1px 0 rgba(200, 220, 255, 0.14);
+}
+@keyframes al-mark-shine {
+  0% { background-position: -70% -70%; }
+  32% { background-position: 170% 170%; }
+  100% { background-position: 170% 170%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .alloy-logo-mark::before { animation: none; opacity: 0.4; background-position: 50% 50%; }
+}
+.alloy-wordmark {
+  font-family: var(--alloy-display), sans-serif; font-size: 19px; letter-spacing: 0.22em;
+  background: linear-gradient(180deg, #eaeff4 0%, #d3dbe3 30%, #94a0ac 52%, #e8eef3 62%, #78838f 78%, #dbe3ea 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent; white-space: nowrap;
+}
+.alloy-nav { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; flex: 1 1 auto; }
+.alloy-navlink {
+  position: relative; font-family: var(--alloy-body), sans-serif; font-size: 13px; font-weight: 600;
+  letter-spacing: 0.03em; white-space: nowrap; padding: 8px 12px; border-radius: 8px; border: 1px solid transparent;
+  background: transparent; color: rgba(214, 224, 233, 0.62); cursor: pointer;
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
+}
+.alloy-navlink:hover { color: #f2f6fa; background: rgba(255, 255, 255, 0.06); }
+.alloy-navlink-active {
+  background: rgba(255, 255, 255, 0.11); color: #f2f6fa; border-color: rgba(255, 255, 255, 0.18);
+}
+.alloy-navlink-badge {
+  position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: #c98a8a;
+}
+
+.alloy-search-btn, .alloy-icon-btn {
+  display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.035); color: rgba(214, 224, 233, 0.7);
+  cursor: none; flex: none; transition: background 0.15s, color 0.15s;
+}
+.alloy-search-btn:hover, .alloy-icon-btn:hover { background: rgba(255, 255, 255, 0.08); color: #f2f6fa; }
+.alloy-search-box {
+  display: flex; align-items: center; gap: 7px; background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 10px; padding: 7px 10px; flex: none;
+}
+.alloy-search-input { background: transparent; border: 0; outline: none; color: #eef3f7; font-size: 13px; width: 190px; }
+.alloy-search-close { background: transparent; border: 0; color: rgba(200, 212, 224, 0.5); cursor: none; display: flex; padding: 0; }
+.alloy-search-close:hover { color: #f2f6fa; }
+.alloy-search-dropdown {
+  position: absolute; top: calc(100% + 8px); right: 0; width: 320px; max-height: 420px; overflow-y: auto; z-index: 100;
+  padding: 8px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(172deg, #171d22, #0d1114); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+.alloy-search-empty { padding: 20px; text-align: center; font-size: 12.5px; color: rgba(200, 212, 224, 0.5); }
+.alloy-search-heading { font-family: var(--alloy-mono), monospace; font-size: 10px; letter-spacing: 0.1em; color: rgba(200, 212, 224, 0.4); padding: 6px 8px; }
+.alloy-search-row { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 9px; cursor: none; transition: background 0.15s; }
+.alloy-search-row:hover { background: rgba(255, 255, 255, 0.05); }
+.alloy-search-row-title { font-size: 13px; font-weight: 600; color: #eef3f7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alloy-search-row-sub { font-size: 11px; color: rgba(200, 212, 224, 0.5); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alloy-search-row-meta { font-family: var(--alloy-mono), monospace; font-size: 11.5px; color: rgba(210, 222, 232, 0.7); flex: none; }
+
+.alloy-status-pill {
+  display: flex; align-items: center; gap: 7px; font-family: var(--alloy-mono), monospace; font-size: 11px;
+  letter-spacing: 0.08em; color: rgba(200, 212, 224, 0.6); padding: 7px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 999px; white-space: nowrap;
+}
+.alloy-status-dot { width: 6px; height: 6px; border-radius: 50%; background: #8bc3ab; animation: al-pulse 1.8s ease-in-out infinite; flex: none; }
+
+.alloy-online-badge {
+  display: inline-flex; align-items: center; gap: 7px; font-family: var(--alloy-mono), monospace; font-size: 10.5px;
+  letter-spacing: 0.08em; color: rgba(200, 212, 224, 0.55); padding: 5px 10px; text-transform: none;
+  border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 999px; white-space: nowrap;
+}
+.alloy-online-dot { width: 6px; height: 6px; border-radius: 50%; background: #8bc3ab; animation: al-pulse 1.8s ease-in-out infinite; flex: none; }
+
+.alloy-balance {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 1px; font-family: var(--alloy-mono), monospace;
+  font-size: 11px; color: rgba(200, 212, 224, 0.55); white-space: nowrap; line-height: 1.4;
+}
+.alloy-balance b { color: #dee5ec; font-weight: 600; }
+
+.alloy-btn-primary {
+  font-family: var(--alloy-display), sans-serif; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #0d1216 !important; padding: 17px 34px; border: 0; border-radius: 13px; cursor: none;
+  background: linear-gradient(180deg, #f0f4f8 0%, #dae2ea 38%, #a8b3bf 52%, #e9eff4 68%, #c3ccd6 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.95) inset, 0 -1px 0 rgba(0, 0, 0, 0.25) inset, 0 10px 24px rgba(0, 0, 0, 0.32);
+  transition: transform 0.12s ease; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.alloy-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.alloy-btn-header {
+  font-family: var(--alloy-body), sans-serif; font-size: 13.5px; font-weight: 600; letter-spacing: 0.02em;
+  color: #10151a !important; padding: 11px 20px; border: 0; border-radius: 10px; cursor: none; flex: none;
+  background: linear-gradient(180deg, #eff3f7 0%, #dde4eb 40%, #b3bdc8 55%, #e7edf2 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 6px 14px rgba(0, 0, 0, 0.3);
+  transition: transform 0.12s ease, box-shadow 0.2s ease;
+}
+.alloy-btn-header:hover { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 8px 20px rgba(120, 160, 200, 0.2); }
+.alloy-btn-secondary {
+  font-family: var(--alloy-body), sans-serif; font-size: 14.5px; font-weight: 600; color: #e7eef4;
+  padding: 17px 28px; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 13px; cursor: none;
+  background: rgba(255, 255, 255, 0.05); transition: transform 0.12s ease, background 0.2s;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.alloy-btn-secondary:hover { background: rgba(255, 255, 255, 0.11); }
+
+/* ---------- Ticker marquee ---------- */
+.alloy-ticker-wrap {
+  position: relative; z-index: 20; overflow: hidden; border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.25));
+}
+.alloy-ticker-track {
+  display: flex; width: max-content; animation: al-marq 46s linear infinite;
+  font-family: var(--alloy-mono), monospace; font-size: 11.5px; line-height: 1.6; letter-spacing: 0.1em;
+  padding: 11px 0; color: rgba(214, 225, 235, 0.5); white-space: nowrap;
+}
+.alloy-ticker-group { display: flex; gap: 34px; padding-right: 34px; flex: none; }
+.alloy-ticker-item { display: flex; gap: 8px; flex: none; }
+.alloy-ticker-item-link { cursor: none; transition: color 0.15s; border-radius: 4px; }
+.alloy-ticker-item-link:hover { color: #f2f6fa; }
+
+/* ---------- Home hero ---------- */
+.alloy-hero {
+  position: relative; z-index: 3; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 56px; align-items: center; padding: 72px 40px 84px; max-width: 1400px; margin: 0 auto;
+}
+.alloy-eyebrow {
+  display: inline-flex; align-items: center; gap: 9px; font-family: var(--alloy-mono), monospace; font-size: 11px;
+  letter-spacing: 0.16em; color: rgba(205, 217, 228, 0.7); padding: 7px 13px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.035); margin-bottom: 26px;
+}
+.alloy-kicker {
+  font-family: var(--alloy-mono), monospace; font-size: 10.5px; letter-spacing: 0.16em; color: rgba(200, 212, 224, 0.45);
+  margin-bottom: 12px;
+}
+.alloy-h1 {
+  font-family: var(--alloy-display), sans-serif; font-size: clamp(46px, 6.4vw, 104px); line-height: 1.02;
+  letter-spacing: -0.01em; margin: 0 0 24px; text-transform: uppercase;
+  background: linear-gradient(178deg, #eef2f6 0%, #dbe2e9 18%, #a7b1bc 40%, #f2f6f9 50%, #7c8793 60%, #c2ccd5 78%, #e6ecf1 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent; text-wrap: balance;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
+}
+.alloy-h1-page {
+  font-family: var(--alloy-display), sans-serif; font-size: clamp(38px, 5vw, 68px); line-height: 1.02;
+  letter-spacing: -0.01em; margin: 0 0 12px; text-transform: uppercase;
+  background: linear-gradient(178deg, #eef2f6 0%, #dbe2e9 18%, #a7b1bc 40%, #f2f6f9 50%, #7c8793 60%, #c2ccd5 78%, #e6ecf1 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.alloy-tagline { max-width: 520px; font-size: 17.5px; line-height: 1.55; color: rgba(206, 218, 229, 0.72); margin: 0 0 34px; text-wrap: pretty; }
+.alloy-p { font-size: 15.5px; line-height: 1.55; color: rgba(203, 215, 227, 0.66); max-width: 560px; margin: 0 0 30px; }
+.alloy-cta-row { display: flex; flex-wrap: wrap; gap: 13px; align-items: center; }
+.alloy-microcopy { font-family: var(--alloy-mono), monospace; font-size: 11.5px; color: rgba(200, 212, 224, 0.45); letter-spacing: 0.06em; }
+
+.alloy-stats-row { display: flex; gap: 44px; margin-top: 56px; padding-top: 28px; border-top: 1px solid rgba(255, 255, 255, 0.09); flex-wrap: wrap; }
+.alloy-stat-value {
+  font-family: var(--alloy-display), sans-serif; font-size: 30px; letter-spacing: -0.02em;
+  background: linear-gradient(180deg, #e8edf2, #98a4b0); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.alloy-stat-label { font-family: var(--alloy-mono), monospace; font-size: 10.5px; letter-spacing: 0.14em; color: rgba(200, 212, 224, 0.45); margin-top: 5px; }
+
+.alloy-hero-art-mascot { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; min-height: 320px; text-align: center; }
+.alloy-hero-art-mascot-label {
+  font-family: var(--alloy-display), sans-serif; font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase;
+  background: linear-gradient(180deg, #eaeff4 0%, #d3dbe3 30%, #94a0ac 52%, #e8eef3 62%, #78838f 78%, #dbe3ea 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* ---------- Ambient holographic glow (about-page mascot slot) ---------- */
+/* A soft blue/violet/cyan glow that drifts after the cursor within this section (see
+   AmbientGlow — damped follow + a slow independent idle drift, both folded into its own
+   requestAnimationFrame loop that only ever writes --mx/--my) sits behind the real Alloy
+   mark. The mark itself picks up a matching cursor-tracked conic sheen and a few degrees
+   of tilt via PrismCard, the same pointer-tracked treatment used on cards elsewhere —
+   .alloy-logo-card .prism-card-sheen below just recolors PrismCard's default white radial
+   sheen to the same hues as the glow, rather than building a second effect from scratch.
+   Kept low-opacity and screen-blended: a strong sheen at this size reads as a gimmick, not
+   a material. */
+.alloy-ambient-stage {
+  position: relative; width: 280px; height: 280px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.alloy-ambient-glow {
+  --mx: 50%; --my: 38%;
+  position: absolute; inset: -25%; z-index: 0; pointer-events: none;
+}
+.alloy-ambient-blob { position: absolute; inset: 0; filter: blur(48px); mix-blend-mode: screen; pointer-events: none; }
+.alloy-ambient-blob-a {
+  background: radial-gradient(340px 340px at var(--mx) var(--my), rgba(94, 146, 255, 0.55) 0%, rgba(122, 92, 255, 0.22) 46%, transparent 74%);
+  opacity: 0.22;
+}
+.alloy-ambient-blob-b {
+  background: radial-gradient(230px 230px at var(--mx) var(--my), rgba(120, 214, 255, 0.4) 0%, transparent 72%);
+  opacity: 0.16;
+}
+
+/* A big, genuinely alive holo disc behind the mark — three stacked screen-blended layers,
+   all reusing effects/keyframes that already exist elsewhere rather than inventing new ones:
+   a slowly spinning iridescent conic-gradient (al-spin, the same rotation .btn-holo/
+   .alloy-logo-card's sheen use), a drifting coin-motif pattern (the exact SVG the GRADUATED
+   seal used to carry before it got simplified into a plain chip — the "value" motif lives
+   here now instead), and the shine-sweep pass (al-seal-shine, shared with .alloy-grad-chip's
+   flavor of the same idea). Sized close to the stage's edge (inset 8%, vs. the mark's own
+   132px puck) so it reads as a real aura, not a thin ring. */
+.alloy-mark-halo {
+  position: absolute;
+  inset: 8%;
+  z-index: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  overflow: hidden;
+  /* Feathers the disc's edge so it reads as a glow fading out, not a coin with a hard rim —
+     the circular clip above is still what keeps the spin layer's -30% inset from spilling
+     past the disc, this just softens where that clip falls. */
+  mask-image: radial-gradient(circle, #000 62%, transparent 100%);
+  -webkit-mask-image: radial-gradient(circle, #000 62%, transparent 100%);
+}
+.alloy-mark-halo-spin {
+  position: absolute;
+  inset: -30%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0.5;
+  background: conic-gradient(from 0deg, rgba(110, 165, 255, 0.55), rgba(150, 120, 255, 0.36) 25%, rgba(120, 220, 255, 0.48) 50%, rgba(150, 120, 255, 0.36) 75%, rgba(110, 165, 255, 0.55) 100%);
+  animation: al-spin 16s linear infinite;
+}
+.alloy-mark-halo-pattern {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0.32;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22'%3E%3Ccircle cx='11' cy='11' r='7' fill='none' stroke='%236ea8f7' stroke-width='1.2'/%3E%3Cpath d='M11 6.8v8.4M8.6 9c0-1.1 1-2 2.4-2s2.4.85 2.4 1.8c0 2.3-4.8 1.3-4.8 3.6 0 1 1 1.8 2.4 1.8s2.4-.8 2.4-1.8' fill='none' stroke='%236ea8f7' stroke-width='1.1' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-size: 26px 26px;
+  animation: al-mark-pattern-drift 22s linear infinite;
+}
+@keyframes al-mark-pattern-drift {
+  from { background-position: 0 0; }
+  to { background-position: 130px 130px; }
+}
+.alloy-mark-halo-shine {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: linear-gradient(115deg, transparent 32%, rgba(210, 225, 255, 0.7) 50%, transparent 68%);
+  background-size: 320% 320%;
+  animation: al-seal-shine 6.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .alloy-mark-halo-spin, .alloy-mark-halo-pattern, .alloy-mark-halo-shine { animation: none; }
+}
+
+.alloy-logo-card {
+  position: relative; z-index: 1; width: 132px; height: 132px; border-radius: 50%; cursor: none;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 34% 26%, #232a31 0%, #171b20 55%, #0c0f12 100%);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 0 1px rgba(120, 150, 220, 0.16);
+}
+.alloy-logo-card .prism-card-sheen {
+  border-radius: 50%;
+  mix-blend-mode: screen;
+  background: conic-gradient(from 160deg at var(--px) var(--py), rgba(110, 165, 255, 0.5), rgba(150, 120, 255, 0.32) 32%, rgba(120, 220, 255, 0.4) 60%, rgba(110, 165, 255, 0.5) 100%);
+}
+.alloy-logo-mark-xl { position: relative; z-index: 1; width: 72px; height: 72px; border-radius: 18px; box-shadow: 0 10px 20px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.7) inset; }
+.alloy-logo-mark-xl::after { inset: 18px; border-radius: 6px; }
+
+/* ---------- Starburst badge (stamped-seal medal) ---------- */
+/* No longer the GRADUATED indicator (that's GraduatedChip.tsx now — a plain pill like the
+   risk badges next to it, per user feedback that this seal was hard to read at a glance and
+   moved distractingly on hover). Still used for the fee-split stat accent on the About page.
+   A clean circular medal — radial-gradient fill, a thin outer ring, and a single diagonal
+   shine band that sweeps once then parks for a few seconds before repeating. The shine-sweep
+   keyframe (al-seal-shine) is reused by .alloy-mark-halo-shine above (behind the Alloy mark)
+   and .alloy-grad-chip-shine (globals.css, the GraduatedChip's background sweep). */
+.alloy-starburst {
+  --star-a: #cfe6ff;
+  --star-b: #ffffff;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, var(--star-a) 0%, var(--star-b) 74%);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4), 0 0 0 2px rgba(255, 255, 255, 0.55) inset;
+  cursor: none;
+  overflow: hidden;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.alloy-starburst:hover {
+  transform: scale(1.1) translateY(-2px);
+}
+.alloy-starburst-shine {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: linear-gradient(115deg, transparent 32%, rgba(255, 255, 255, 0.95) 50%, transparent 68%);
+  background-size: 320% 320%;
+  animation: al-seal-shine 6.5s ease-in-out infinite;
+}
+@keyframes al-seal-shine {
+  0% { background-position: -80% -80%; }
+  24% { background-position: 180% 180%; }
+  100% { background-position: 180% 180%; }
+}
+.alloy-starburst-text {
+  position: relative;
+  z-index: 1;
+  max-width: 76%;
+  font-family: var(--alloy-display), sans-serif;
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.05;
+  color: #0d2a45;
+}
+@media (prefers-reduced-motion: reduce) {
+  .alloy-starburst { transition: none; }
+  .alloy-starburst-shine { animation: none; }
+}
+
+.alloy-section { position: relative; z-index: 3; padding: 14px 40px 96px; max-width: 1400px; margin: 0 auto; }
+.alloy-section-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 26px; }
+.alloy-h2 {
+  font-family: var(--alloy-display), sans-serif; font-size: 30px; letter-spacing: -0.02em; margin: 0; text-transform: uppercase;
+  background: linear-gradient(180deg, #e6ebf0, #939fab); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.alloy-section-tag { font-family: var(--alloy-mono), monospace; font-size: 11px; letter-spacing: 0.12em; color: rgba(200, 212, 224, 0.45); }
+
+.alloy-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
+.alloy-card {
+  position: relative; overflow: hidden; padding: 18px; border-radius: 16px; cursor: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(168deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.02) 42%, rgba(0, 0, 0, 0.28)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.022) 0 1px, rgba(0, 0, 0, 0) 1px 3px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.14) inset, 0 10px 22px rgba(0, 0, 0, 0.26);
+  transition: border-color 0.2s;
+  display: block;
+}
+.alloy-card:hover { border-color: rgba(255, 255, 255, 0.28); }
+.alloy-card-top { display: flex; gap: 13px; align-items: center; margin-bottom: 15px; }
+.alloy-card-icon { width: 46px; height: 46px; flex: none; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.16); overflow: hidden; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; }
+.alloy-card-name { font-family: var(--alloy-display), sans-serif; font-size: 15.5px; letter-spacing: 0.01em; color: #f0f5f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alloy-card-sub { font-family: var(--alloy-mono), monospace; font-size: 11px; color: rgba(200, 212, 224, 0.5); margin-top: 3px; }
+.alloy-card-pct { font-family: var(--alloy-mono), monospace; font-size: 12.5px; font-weight: 600; color: #8bc3ab; }
+.alloy-card-meta { display: flex; justify-content: space-between; font-family: var(--alloy-mono), monospace; font-size: 10.5px; letter-spacing: 0.1em; color: rgba(200, 212, 224, 0.45); margin-bottom: 7px; }
+.alloy-card-bar-track { height: 7px; border-radius: 99px; background: rgba(0, 0, 0, 0.5); overflow: hidden; box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset; }
+.alloy-card-bar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #6b757f, #d6dfe7 45%, #a3aeb9 62%, #e7edf2); box-shadow: 0 0 7px rgba(200, 225, 255, 0.22); }
+
+.alloy-steps-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+.alloy-step {
+  position: relative; overflow: hidden; padding: 30px 26px 28px; border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(150deg, #1c2228, #0c1014 55%, #161c22), repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, rgba(0, 0, 0, 0) 1px 3px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.16) inset, 0 16px 38px rgba(0, 0, 0, 0.35);
+}
+.alloy-step-sheen { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.06) 48%, transparent 60%); background-size: 240% 100%; animation: al-sheen 11s ease-in-out infinite; }
+.alloy-step-num { position: relative; font-family: var(--alloy-display), sans-serif; font-size: 46px; line-height: 1; letter-spacing: -0.04em; background: linear-gradient(180deg, #e9eef3, #c0cad4 40%, #79838e 70%, #dde4ea); -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 16px; }
+.alloy-step-h { position: relative; font-family: var(--alloy-body), sans-serif; font-size: 18px; font-weight: 700; color: #eef4f8; margin-bottom: 9px; }
+.alloy-step-p { position: relative; margin: 0; font-size: 14.5px; line-height: 1.55; color: rgba(203, 215, 227, 0.66); text-wrap: pretty; }
+
+.alloy-final { position: relative; z-index: 3; padding: 0 40px 110px; text-align: center; max-width: 900px; margin: 0 auto; }
+.alloy-final-h2 {
+  font-family: var(--alloy-display), sans-serif; font-size: clamp(34px, 4.4vw, 64px); line-height: 1.04; letter-spacing: -0.01em;
+  text-transform: uppercase; margin: 0 0 20px;
+  background: linear-gradient(178deg, #ecf1f5, #d8e0e8 22%, #9aa5b0 46%, #eef3f7 54%, #7d8894 66%, #dee5eb);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.alloy-final-p { font-size: 17px; line-height: 1.55; color: rgba(203, 215, 227, 0.68); margin: 0 auto 30px; max-width: 560px; }
+
+.alloy-footer-columns {
+  position: relative; z-index: 3; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 26px; padding: 44px 40px 30px; max-width: 1400px; margin: 0 auto;
+}
+.alloy-footer-col-title {
+  font-family: var(--alloy-display), sans-serif; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: #dbe3ea; margin-bottom: 12px;
+}
+.alloy-footer-col-links { display: flex; flex-direction: column; gap: 9px; }
+.alloy-footer-col-links a {
+  font-size: 12.5px; color: rgba(200, 212, 224, 0.55); transition: color 0.15s; width: fit-content;
+}
+.alloy-footer-col-links a:hover { color: #f2f6fa; }
+
+.alloy-footer {
+  position: relative; z-index: 3; display: flex; flex-wrap: wrap; gap: 20px; align-items: center; padding: 26px 40px 40px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09); font-family: var(--alloy-mono), monospace; font-size: 11.5px;
+  letter-spacing: 0.08em; color: rgba(200, 212, 224, 0.45); max-width: 1400px; margin: 0 auto;
+}
+/* ---------- Dashboard pages (create / stake / token / leaderboard / connect / deposit / wallet / board) ---------- */
+.alloy-dash { position: relative; z-index: 3; max-width: 1180px; margin: 0 auto; padding: 44px 40px 90px; }
+.alloy-dash-wide { position: relative; z-index: 3; max-width: 1400px; margin: 0 auto; padding: 44px 40px 90px; }
+
+.alloy-panel {
+  padding: 28px; border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(172deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.28));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.11) inset, 0 10px 22px rgba(0, 0, 0, 0.26);
+}
+.alloy-panel-dark {
+  padding: 28px; border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(150deg, #1c2228, #0c1014 60%, #161c22);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.13) inset, 0 16px 38px rgba(0, 0, 0, 0.35);
+}
+
+.alloy-stat-card {
+  padding: 22px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(172deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.26));
+}
+.alloy-stat-k { font-family: var(--alloy-mono), monospace; font-size: 10.5px; letter-spacing: 0.14em; color: rgba(200, 212, 224, 0.45); margin-bottom: 9px; }
+.alloy-stat-v {
+  font-family: var(--alloy-display), sans-serif; font-size: 27px; letter-spacing: -0.01em;
+  background: linear-gradient(180deg, #e8edf2, #98a4b0); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.alloy-stat-v.up { background: linear-gradient(180deg, #cfe9dc, #8bc3ab); -webkit-background-clip: text; background-clip: text; }
+.alloy-stat-v.down { background: linear-gradient(180deg, #e8cfcf, #c98a8a); -webkit-background-clip: text; background-clip: text; }
+
+.alloy-label {
+  display: block; font-family: var(--alloy-mono), monospace; font-size: 10.5px; letter-spacing: 0.14em;
+  color: rgba(200, 212, 224, 0.5); margin-bottom: 8px;
+}
+.alloy-input, .alloy-textarea {
+  width: 100%; font-family: var(--alloy-body), sans-serif; font-size: 15px; color: #eef3f7;
+  padding: 13px 14px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.4); outline: none; transition: border-color 0.15s;
+}
+.alloy-input:focus, .alloy-textarea:focus { border-color: rgba(226, 236, 245, 0.5); }
+.alloy-input.mono { font-family: var(--alloy-mono), monospace; }
+.alloy-textarea { resize: vertical; line-height: 1.5; }
+
+/* Type-ahead token picker for the "How we catch rugs" live demo (RugRiskExplainer) —
+   a plain <select> couldn't be searched by ticker/name, only scrolled. */
+.alloy-rug-picker {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 5;
+  max-height: 240px; overflow-y: auto; border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14); background: #12161a;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
+}
+.alloy-rug-picker-row {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  padding: 9px 12px; font-size: 13px; color: #eef3f7; background: transparent; border: none; cursor: pointer;
+}
+.alloy-rug-picker-row:hover, .alloy-rug-picker-row-active { background: rgba(255, 255, 255, 0.06); }
+.alloy-rug-picker-empty { padding: 12px; font-size: 12.5px; color: rgba(200, 212, 224, 0.5); }
+
+.alloy-tabs { display: flex; gap: 6px; padding: 4px; border-radius: 10px; background: rgba(0, 0, 0, 0.42); }
+.alloy-tab {
+  flex: 1; font-family: var(--alloy-body), sans-serif; font-size: 13px; font-weight: 600; padding: 9px;
+  border: 0; border-radius: 8px; cursor: pointer; background: transparent; color: rgba(206, 218, 229, 0.6);
+  transition: background 0.18s, color 0.18s; white-space: nowrap;
+}
+.alloy-tab-active { background: rgba(255, 255, 255, 0.13); color: #f2f6fa; }
+
+.alloy-underline-tabs { display: flex; gap: 4px; border-bottom: 1px solid rgba(255, 255, 255, 0.09); flex-wrap: wrap; }
+.alloy-underline-tab {
+  font-family: var(--alloy-body), sans-serif; font-size: 13.5px; font-weight: 600; padding: 10px 6px; margin-right: 20px;
+  border: 0; border-bottom: 2px solid transparent; background: transparent; color: rgba(206, 218, 229, 0.55); cursor: pointer;
+  transition: color 0.18s, border-color 0.18s;
+}
+.alloy-underline-tab-active { color: #f2f6fa; border-color: #dee5ec; }
+
+.alloy-row { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.07); font-size: 13.5px; gap: 12px; }
+.alloy-row:last-child { border-bottom: 0; }
+.alloy-row-k { color: rgba(203, 215, 227, 0.55); }
+.alloy-row-v { font-family: var(--alloy-mono), monospace; color: #dee5ec; }
+
+.alloy-table { border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.1); overflow: hidden; background: linear-gradient(172deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.26)); }
+.alloy-table-head {
+  display: grid; gap: 14px; padding: 16px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  font-family: var(--alloy-mono), monospace; font-size: 10px; letter-spacing: 0.14em; color: rgba(200, 212, 224, 0.42);
+}
+.alloy-table-row {
+  display: grid; gap: 14px; padding: 17px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  align-items: center; transition: background 0.18s;
+}
+.alloy-table-row:last-child { border-bottom: 0; }
+.alloy-table-row.clickable { cursor: pointer; }
+.alloy-table-row.clickable:hover { background: rgba(255, 255, 255, 0.045); }
+
+.alloy-chip {
+  font-family: var(--alloy-mono), monospace; font-size: 11px; letter-spacing: 0.08em; padding: 8px 13px;
+  border-radius: 8px; cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.06);
+  color: #dbe3ea; transition: background 0.18s, border-color 0.18s; white-space: nowrap;
+}
+.alloy-chip:hover { background: rgba(255, 255, 255, 0.11); }
+.alloy-chip.active { border-color: rgba(226, 236, 245, 0.55); background: rgba(226, 236, 245, 0.14); color: #f2f6fa; }
+
+.alloy-icon-tile {
+  border-radius: 12px; background: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.11) 0 5px, rgba(255, 255, 255, 0.04) 5px 10px);
+  border: 1px solid rgba(255, 255, 255, 0.13); display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+
+.alloy-verified {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; width: 15px; height: 15px; border-radius: 50%;
+  background: linear-gradient(160deg, #eaf0f5, #b9c3ce 45%, #8b96a2 62%, #dde4ea);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 0 0 1px rgba(10, 14, 18, 0.45);
+  font-family: var(--alloy-mono), monospace; font-size: 9px; font-weight: 700; line-height: 1; color: #12181d;
+}
+
+.alloy-rank { font-family: var(--alloy-display), sans-serif; font-size: 19px; }
+.alloy-rank-1 { color: #e6d4a8; }
+.alloy-rank-2 { color: #d8dee5; }
+.alloy-rank-3 { color: #c9a582; }
+.alloy-rank-n { color: rgba(200, 212, 224, 0.4); }
+
+.alloy-empty { padding: 60px 20px; text-align: center; font-size: 13.5px; color: rgba(203, 215, 227, 0.5); }
+
+/* ---------- Home dashboard (Leaderboard + Feed, 2-up) ---------- */
+.alloy-home-top { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; margin-bottom: 32px; }
+.alloy-home-grid { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr) minmax(0, 320px); gap: 20px; align-items: start; }
+.alloy-home-panel { padding: 22px; max-height: 640px; overflow-y: auto; }
+.alloy-home-panel-lg { max-height: 760px; }
+.alloy-home-panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+.alloy-home-panel-title { font-family: var(--alloy-display), sans-serif; font-size: 17px; letter-spacing: 0.01em; color: #f0f5f9; margin: 0; text-transform: uppercase; }
+
+/* Coin rows in the homepage leaderboard's "Coins" mode — PrismCard already supplies the
+   pointer-tracked tilt + sheen (--px/--py/--rx/--ry, .prism-card-sheen); this just gives
+   the row its layout and a resting/hover surface so the sheen has something to sit on top
+   of, matching the "pop + glow" the trending list on the homepage asked for. */
+.alloy-lb-coin-row {
+  display: flex; align-items: center; gap: 12px; padding: 12px; margin-bottom: 8px; border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.02); cursor: none;
+  transition: border-color 0.2s, background 0.2s;
+}
+.alloy-lb-coin-row:hover { border-color: rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.045); }
+.alloy-lb-coin-bar-track { height: 4px; border-radius: 99px; background: rgba(0, 0, 0, 0.5); overflow: hidden; margin-top: 6px; max-width: 140px; }
+.alloy-lb-coin-bar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #6b757f, #d6dfe7 45%, #a3aeb9 62%, #e7edf2); }
+.alloy-lb-coin-list { display: flex; flex-direction: column; }
+
+.alloy-pnl-list { display: flex; flex-direction: column; gap: 2px; }
+.alloy-pnl-row { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 9px; transition: background 0.15s; }
+.alloy-pnl-row:hover { background: rgba(255, 255, 255, 0.05); }
+/* A holo foil sheen behind every name/coin row on the homepage leaderboards, on hover only —
+   z-index: -1 keeps it under the row's own (non-positioned, so default-stacked-above) icon/
+   text content while still sitting above the row's plain hover background.
+   PersonRow wraps this row in PrismCard, which sets --px/--py to the cursor's position (0-100%)
+   directly on this same element — centering the rainbow on that point instead of the row's
+   middle turns the flat color fade into a "shiny plastic" patch that moves with the pointer,
+   on top of PrismCard's own white sheen + tilt. */
+.alloy-pnl-row::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: -1;
+  background: radial-gradient(
+    240px circle at var(--px, 50%) var(--py, 50%),
+    #6fd8ff, #a98cff 30%, #ff8fd0 52%, #ffe28a 70%, transparent 88%
+  );
+  opacity: 0; mix-blend-mode: screen; pointer-events: none; transition: opacity 0.3s ease;
+}
+.alloy-pnl-row:hover::before { opacity: 0.6; }
+@media (prefers-reduced-motion: reduce) {
+  .alloy-pnl-row::before { transition: none; }
+}
+.alloy-pnl-rank { flex: none; width: 16px; font-family: var(--alloy-mono), monospace; font-size: 11px; color: rgba(200, 212, 224, 0.4); }
+.alloy-pnl-name { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: #e9eef3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alloy-pnl-value { flex: none; font-family: var(--alloy-mono), monospace; font-size: 12.5px; font-weight: 600; }
+.alloy-pnl-value.up { color: #8bc3ab; }
+.alloy-pnl-value.down { color: #c98a8a; }
+
+.alloy-trend-list { display: flex; flex-direction: column; gap: 4px; }
+.alloy-trend-row { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 10px; transition: background 0.15s; }
+.alloy-trend-row:hover { background: rgba(255, 255, 255, 0.05); }
+.alloy-trend-name { display: block; font-size: 13px; font-weight: 600; color: #eef3f7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alloy-trend-sub { display: block; font-family: var(--alloy-mono), monospace; font-size: 10.5px; color: rgba(200, 212, 224, 0.45); margin-top: 2px; }
+.alloy-trend-mcap { flex: none; font-family: var(--alloy-mono), monospace; font-size: 11.5px; color: rgba(210, 222, 232, 0.7); }
+
+.alloy-callout-card {
+  padding: 16px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.025);
+}
+.alloy-callout-head { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; }
+.alloy-callout-name { font-weight: 600; color: #eef3f7; border-radius: 6px; }
+.alloy-callout-time { color: rgba(200, 212, 224, 0.45); font-size: 12px; }
+.alloy-callout-body { font-size: 13.5px; color: #dee5ec; line-height: 1.5; white-space: pre-wrap; margin: 0; }
+.alloy-callout-token {
+  display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px;
+  border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.09); background: rgba(255, 255, 255, 0.03);
+}
+.alloy-callout-token-name { display: block; font-family: var(--alloy-display), sans-serif; font-size: 13px; color: #f0f5f9; }
+.alloy-callout-token-sub { display: block; font-family: var(--alloy-mono), monospace; font-size: 10.5px; color: rgba(200, 212, 224, 0.5); margin-top: 2px; }
+
+.alloy-callout-actions { display: flex; gap: 16px; margin-top: 10px; }
+.alloy-callout-action {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: rgba(200, 212, 224, 0.55);
+  background: transparent; border: 0; cursor: pointer; padding: 2px 0; transition: color 0.15s;
+}
+.alloy-callout-action:hover { color: #dee5ec; }
+.alloy-callout-action.liked { color: #c98a8a; }
+.alloy-callout-replies { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.07); display: flex; flex-direction: column; gap: 8px; }
+.alloy-callout-reply { display: flex; gap: 8px; align-items: flex-start; }
+
+@media (max-width: 1080px) {
+  .alloy-home-grid { grid-template-columns: 1fr; }
+  .alloy-home-panel { max-height: none; order: initial; }
+}
+
+/* ---------- Profile page (banner + 3-up: tokens made | profile | top trades) ---------- */
+.alloy-profile-banner {
+  height: 200px; border-radius: 18px; position: relative; overflow: hidden;
+  background: linear-gradient(135deg, #1c2228, #0c1014 55%, #161c22);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.alloy-profile-banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.alloy-profile-banner-clickable { cursor: pointer; }
+.alloy-profile-banner-edit-hint {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: rgba(8, 10, 12, 0); opacity: 0; transition: background 0.15s ease, opacity 0.15s ease;
+  font-family: var(--alloy-mono); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: #eef3f7;
+}
+.alloy-profile-banner-clickable:hover .alloy-profile-banner-edit-hint {
+  background: rgba(8, 10, 12, 0.45); opacity: 1;
+}
+.alloy-profile-banner-empty {
+  height: 128px; border-radius: 18px; position: relative; cursor: pointer;
+  border: 1.5px dashed rgba(200, 212, 224, 0.28);
+  background: rgba(255, 255, 255, 0.02);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-family: var(--alloy-mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(200, 212, 224, 0.55);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.alloy-profile-banner-empty:hover {
+  border-color: rgba(200, 212, 224, 0.55); color: #eef3f7; background: rgba(255, 255, 255, 0.04);
+}
+.alloy-avatar-clickable { cursor: pointer; position: relative; }
+.alloy-avatar-clickable .alloy-avatar-edit-hint {
+  position: absolute; inset: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: rgba(8, 10, 12, 0); opacity: 0; transition: background 0.15s ease, opacity 0.15s ease; color: #eef3f7;
+}
+.alloy-avatar-clickable:hover .alloy-avatar-edit-hint { background: rgba(8, 10, 12, 0.5); opacity: 1; }
+
+.alloy-banner-menu {
+  position: absolute; top: 100%; right: 0; margin-top: 8px; z-index: 30;
+  width: 240px; padding: 12px; border-radius: 14px;
+  background: #14181d; border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.alloy-banner-menu-upload {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 12.5px; color: #eef3f7; cursor: pointer; transition: border-color 0.15s ease;
+}
+.alloy-banner-menu-upload:hover { border-color: rgba(200, 212, 224, 0.4); }
+.alloy-banner-menu-label {
+  font-family: var(--alloy-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(200, 212, 224, 0.45);
+}
+.alloy-banner-preset-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.alloy-banner-preset-swatch {
+  height: 36px; border-radius: 9px; cursor: pointer; border: 1.5px solid rgba(255, 255, 255, 0.12);
+  background-size: 240% 240%; animation: alloyBannerShift 9s ease infinite;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.alloy-banner-preset-swatch:hover { border-color: rgba(255, 255, 255, 0.5); transform: scale(1.04); }
+.alloy-banner-preset-swatch-active { border-color: #eef3f7; }
+
+.alloy-banner-preset-1 { background-image: linear-gradient(120deg, #23282e, #6b7785, #2b3540, #4a5560); }
+.alloy-banner-preset-2 { background-image: linear-gradient(135deg, #171b1f, #4a5a68, #8a99a6, #2a333c); animation-duration: 12s; }
+.alloy-banner-preset-3 { background-image: linear-gradient(100deg, #1c2127, #5c6672, #262b31, #7c8894); animation-duration: 7s; animation-direction: reverse; }
+.alloy-banner-preset-4 { background-image: linear-gradient(160deg, #101418, #384450, #6d7b88, #1a2229); animation-duration: 15s; }
+
+@keyframes alloyBannerShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.alloy-profile-grid {
+  display: grid; grid-template-columns: 260px minmax(0, 1fr) 320px;
+  grid-template-areas: "left center right"; gap: 20px; align-items: start;
+}
+.alloy-profile-left { grid-area: left; }
+.alloy-profile-center { grid-area: center; min-width: 0; }
+.alloy-profile-right { grid-area: right; }
+@media (max-width: 1200px) {
+  .alloy-profile-grid { grid-template-columns: 1fr; grid-template-areas: "center" "right" "left"; }
+}
+
+@media (max-width: 860px) {
+  .alloy-hero { grid-template-columns: 1fr; }
+  .alloy-dash, .alloy-dash-wide { padding-left: 20px; padding-right: 20px; }
+  .alloy-header { padding: 14px 20px; }
+  .alloy-section { padding-left: 20px; padding-right: 20px; }
+}
+
+/* ================================================================================
+   Light theme (/settings, lib/settings.ts) — every rule above is the dark original,
+   untouched. This section is purely additive: same structure, spacing, gradients-as-shapes
+   and animations throughout, just relit for a soft white/gray backdrop instead of near-black.
+   Gradient text/fills that read as "light metal on dark" up above get mirrored to "dark
+   graphite on light" here (same stop pattern, inverted lightness) rather than just brightened,
+   so contrast holds. Two effects rely on `mix-blend-mode: screen`, which composites against a
+   dark backdrop but goes invisible over a light one (white-on-white stays white) — the ambient
+   glow behind the About-page mark and the homepage leaderboard hover foil both flip to
+   `multiply` here. Sections below follow this file's own order (header/nav → ticker → hero →
+   about-page mark → cards/sections/steps → footer → dashboard panels/inputs/tabs/table/chips →
+   home leaderboard/feed rows → profile/banner) so it's easy to audit against the dark rule
+   directly above each block. `.alloy-starburst` (the About page's fee-split stat accent),
+   `.alloy-verified`, `.alloy-logo-mark`, and `.alloy-logo-card` are deliberately not overridden — they're
+   self-contained opaque chips/pucks whose own fill (not the page background) is what their
+   shine/text reads against, so they already work unchanged on either theme. */
+
+[data-theme="light"] .alloy-page {
+  background:
+    radial-gradient(1100px 620px at 72% -10%, #ffffff 0%, rgba(255, 255, 255, 0) 62%),
+    radial-gradient(760px 520px at 8% 8%, #e3e8ec 0%, rgba(227, 232, 236, 0) 60%),
+    #eef1f4;
+  color: #12181d;
+}
+
+/* ---------- Header / nav ---------- */
+[data-theme="light"] .alloy-header { background: #f7f8fa; border-color: rgba(10, 16, 22, 0.09); }
+[data-theme="light"] .alloy-wordmark,
+[data-theme="light"] .alloy-hero-art-mascot-label {
+  background: linear-gradient(180deg, #1b2126 0%, #333c44 30%, #5b6570 52%, #232a30 62%, #79828d 78%, #2c343b 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+[data-theme="light"] .alloy-navlink { color: rgba(18, 24, 29, 0.62); }
+[data-theme="light"] .alloy-navlink:hover { color: #12181d; background: rgba(10, 16, 22, 0.05); }
+[data-theme="light"] .alloy-navlink-active { background: rgba(10, 16, 22, 0.08); color: #12181d; border-color: rgba(10, 16, 22, 0.14); }
+
+[data-theme="light"] .alloy-search-btn, [data-theme="light"] .alloy-icon-btn {
+  border-color: rgba(10, 16, 22, 0.12); background: rgba(10, 16, 22, 0.03); color: rgba(18, 24, 29, 0.6);
+}
+[data-theme="light"] .alloy-search-btn:hover, [data-theme="light"] .alloy-icon-btn:hover {
+  background: rgba(10, 16, 22, 0.07); color: #12181d;
+}
+[data-theme="light"] .alloy-search-box { background: rgba(10, 16, 22, 0.04); border-color: rgba(10, 16, 22, 0.16); }
+[data-theme="light"] .alloy-search-input { color: #12181d; }
+[data-theme="light"] .alloy-search-close { color: rgba(18, 24, 29, 0.5); }
+[data-theme="light"] .alloy-search-close:hover { color: #12181d; }
+[data-theme="light"] .alloy-search-dropdown {
+  background: linear-gradient(172deg, #ffffff, #f3f5f7); border-color: rgba(10, 16, 22, 0.1);
+  box-shadow: 0 20px 50px rgba(20, 30, 40, 0.18);
+}
+[data-theme="light"] .alloy-search-empty { color: rgba(18, 24, 29, 0.5); }
+[data-theme="light"] .alloy-search-heading { color: rgba(18, 24, 29, 0.4); }
+[data-theme="light"] .alloy-search-row:hover { background: rgba(10, 16, 22, 0.05); }
+[data-theme="light"] .alloy-search-row-title { color: #12181d; }
+[data-theme="light"] .alloy-search-row-sub { color: rgba(18, 24, 29, 0.5); }
+[data-theme="light"] .alloy-search-row-meta { color: rgba(18, 24, 29, 0.6); }
+
+[data-theme="light"] .alloy-status-pill, [data-theme="light"] .alloy-online-badge {
+  color: rgba(18, 24, 29, 0.6); border-color: rgba(10, 16, 22, 0.12);
+}
+[data-theme="light"] .alloy-balance { color: rgba(18, 24, 29, 0.55); }
+[data-theme="light"] .alloy-balance b { color: #12181d; }
+
+[data-theme="light"] .alloy-btn-primary, [data-theme="light"] .alloy-btn-header {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.95) inset, 0 -1px 0 rgba(0, 0, 0, 0.2) inset,
+    0 8px 20px rgba(20, 30, 40, 0.2), 0 0 0 1px rgba(10, 16, 22, 0.08);
+}
+[data-theme="light"] .alloy-btn-secondary { color: #12181d; border-color: rgba(10, 16, 22, 0.18); background: rgba(10, 16, 22, 0.03); }
+[data-theme="light"] .alloy-btn-secondary:hover { background: rgba(10, 16, 22, 0.07); }
+
+/* ---------- Ticker marquee ---------- */
+[data-theme="light"] .alloy-ticker-wrap { border-color: rgba(10, 16, 22, 0.08); background: linear-gradient(180deg, rgba(10, 16, 22, 0.03), rgba(10, 16, 22, 0.01)); }
+[data-theme="light"] .alloy-ticker-track { color: rgba(18, 24, 29, 0.55); }
+[data-theme="light"] .alloy-ticker-item-link:hover { color: #12181d; }
+
+/* ---------- Home hero ---------- */
+[data-theme="light"] .alloy-eyebrow { color: rgba(18, 24, 29, 0.7); border-color: rgba(10, 16, 22, 0.14); background: rgba(10, 16, 22, 0.03); }
+[data-theme="light"] .alloy-kicker { color: rgba(18, 24, 29, 0.45); }
+[data-theme="light"] .alloy-h1, [data-theme="light"] .alloy-h1-page {
+  background: linear-gradient(178deg, #171d22 0%, #2a323a 18%, #57616c 40%, #101417 50%, #838d97 60%, #3d454d 78%, #1c2126 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 8px 18px rgba(20, 30, 40, 0.12));
+}
+[data-theme="light"] .alloy-tagline { color: rgba(18, 24, 29, 0.72); }
+[data-theme="light"] .alloy-p { color: rgba(18, 24, 29, 0.66); }
+[data-theme="light"] .alloy-microcopy { color: rgba(18, 24, 29, 0.45); }
+
+[data-theme="light"] .alloy-stats-row { border-color: rgba(10, 16, 22, 0.1); }
+[data-theme="light"] .alloy-stat-value {
+  background: linear-gradient(180deg, #1c2126, #4b5560); -webkit-background-clip: text; background-clip: text;
+}
+[data-theme="light"] .alloy-stat-label { color: rgba(18, 24, 29, 0.45); }
+
+/* ---------- About-page mark (ambient glow + halo) ---------- */
+[data-theme="light"] .alloy-ambient-blob { mix-blend-mode: multiply; }
+[data-theme="light"] .alloy-ambient-blob-a {
+  background: radial-gradient(340px 340px at var(--mx) var(--my), rgba(94, 146, 255, 0.32) 0%, rgba(122, 92, 255, 0.14) 46%, transparent 74%);
+  opacity: 0.4;
+}
+[data-theme="light"] .alloy-ambient-blob-b {
+  background: radial-gradient(230px 230px at var(--mx) var(--my), rgba(80, 180, 220, 0.28) 0%, transparent 72%);
+  opacity: 0.3;
+}
+[data-theme="light"] .alloy-mark-halo-spin {
+  mix-blend-mode: multiply;
+  opacity: 0.3;
+  background: conic-gradient(from 0deg, rgba(70, 110, 220, 0.4), rgba(110, 80, 210, 0.26) 25%, rgba(60, 160, 210, 0.34) 50%, rgba(110, 80, 210, 0.26) 75%, rgba(70, 110, 220, 0.4) 100%);
+}
+[data-theme="light"] .alloy-mark-halo-pattern {
+  mix-blend-mode: multiply;
+  opacity: 0.22;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22' viewBox='0 0 22 22'%3E%3Ccircle cx='11' cy='11' r='7' fill='none' stroke='%232f5fa8' stroke-width='1.2'/%3E%3Cpath d='M11 6.8v8.4M8.6 9c0-1.1 1-2 2.4-2s2.4.85 2.4 1.8c0 2.3-4.8 1.3-4.8 3.6 0 1 1 1.8 2.4 1.8s2.4-.8 2.4-1.8' fill='none' stroke='%232f5fa8' stroke-width='1.1' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+[data-theme="light"] .alloy-mark-halo-shine {
+  mix-blend-mode: multiply;
+  background: linear-gradient(115deg, transparent 32%, rgba(70, 110, 190, 0.4) 50%, transparent 68%);
+}
+
+/* ---------- Section headings / cards / steps / final CTA ---------- */
+[data-theme="light"] .alloy-h2 { background: linear-gradient(180deg, #1e242a, #545f6a); -webkit-background-clip: text; background-clip: text; }
+[data-theme="light"] .alloy-section-tag { color: rgba(18, 24, 29, 0.45); }
+
+[data-theme="light"] .alloy-card {
+  border-color: rgba(10, 16, 22, 0.1);
+  background:
+    linear-gradient(168deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.7) 42%, rgba(10, 16, 22, 0.035)),
+    repeating-linear-gradient(90deg, rgba(10, 16, 22, 0.022) 0 1px, rgba(255, 255, 255, 0) 1px 3px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 10px 22px rgba(20, 30, 40, 0.08);
+}
+[data-theme="light"] .alloy-card:hover { border-color: rgba(10, 16, 22, 0.26); }
+[data-theme="light"] .alloy-card-icon { border-color: rgba(10, 16, 22, 0.14); background: rgba(10, 16, 22, 0.04); }
+[data-theme="light"] .alloy-card-name { color: #12181d; }
+[data-theme="light"] .alloy-card-sub { color: rgba(18, 24, 29, 0.55); }
+[data-theme="light"] .alloy-card-meta { color: rgba(18, 24, 29, 0.5); }
+[data-theme="light"] .alloy-card-bar-track { background: rgba(10, 16, 22, 0.08); }
+[data-theme="light"] .alloy-card-bar-fill { background: linear-gradient(90deg, #3a424a, #6b747d 45%, #4c5560 62%, #232a30); box-shadow: none; }
+
+[data-theme="light"] .alloy-step {
+  border-color: rgba(10, 16, 22, 0.12);
+  background: linear-gradient(150deg, #ffffff, #f3f5f7 55%, #ffffff), repeating-linear-gradient(90deg, rgba(10, 16, 22, 0.02) 0 1px, rgba(255, 255, 255, 0) 1px 3px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 16px 38px rgba(20, 30, 40, 0.08);
+}
+[data-theme="light"] .alloy-step-sheen { background: linear-gradient(105deg, transparent 35%, rgba(10, 16, 22, 0.05) 48%, transparent 60%); }
+[data-theme="light"] .alloy-step-num { background: linear-gradient(180deg, #1e242a, #454e57 40%, #838d97 70%, #2a3138); -webkit-background-clip: text; background-clip: text; }
+[data-theme="light"] .alloy-step-h { color: #12181d; }
+[data-theme="light"] .alloy-step-p { color: rgba(18, 24, 29, 0.66); }
+
+[data-theme="light"] .alloy-final-h2 {
+  background: linear-gradient(178deg, #14181c, #2e353c 22%, #5c6670 46%, #0f1215 54%, #7e8892 66%, #333a41 100%);
+  -webkit-background-clip: text; background-clip: text;
+}
+[data-theme="light"] .alloy-final-p { color: rgba(18, 24, 29, 0.68); }
+
+/* ---------- Footer ---------- */
+[data-theme="light"] .alloy-footer-col-title { color: #1c242b; }
+[data-theme="light"] .alloy-footer-col-links a { color: rgba(18, 24, 29, 0.55); }
+[data-theme="light"] .alloy-footer-col-links a:hover { color: #12181d; }
+[data-theme="light"] .alloy-footer { border-color: rgba(10, 16, 22, 0.09); color: rgba(18, 24, 29, 0.45); }
+
+/* ---------- Dashboard panels / inputs / tabs / table / chips ---------- */
+[data-theme="light"] .alloy-panel {
+  background: linear-gradient(172deg, #ffffff, #eef1f4); border-color: rgba(10, 16, 22, 0.1);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 10px 22px rgba(20, 30, 40, 0.06);
+}
+[data-theme="light"] .alloy-panel-dark {
+  background: linear-gradient(150deg, #f3f5f7, #e3e7ea 60%, #eef1f4); border-color: rgba(10, 16, 22, 0.12);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 16px 38px rgba(20, 30, 40, 0.08);
+}
+[data-theme="light"] .alloy-stat-card { background: linear-gradient(172deg, #ffffff, #eef1f4); border-color: rgba(10, 16, 22, 0.1); }
+[data-theme="light"] .alloy-stat-k { color: rgba(18, 24, 29, 0.45); }
+[data-theme="light"] .alloy-stat-v { background: linear-gradient(180deg, #1c2126, #4b5560); -webkit-background-clip: text; background-clip: text; }
+
+[data-theme="light"] .alloy-label { color: rgba(18, 24, 29, 0.55); }
+[data-theme="light"] .alloy-input, [data-theme="light"] .alloy-textarea {
+  color: #12181d; border-color: rgba(10, 16, 22, 0.16); background: rgba(10, 16, 22, 0.03);
+}
+[data-theme="light"] .alloy-input:focus, [data-theme="light"] .alloy-textarea:focus { border-color: rgba(18, 24, 29, 0.5); }
+
+[data-theme="light"] .alloy-rug-picker { background: #ffffff; border-color: rgba(10, 16, 22, 0.14); box-shadow: 0 14px 30px rgba(20, 30, 40, 0.15); }
+[data-theme="light"] .alloy-rug-picker-row { color: #12181d; }
+[data-theme="light"] .alloy-rug-picker-row:hover, [data-theme="light"] .alloy-rug-picker-row-active { background: rgba(10, 16, 22, 0.05); }
+[data-theme="light"] .alloy-rug-picker-empty { color: rgba(18, 24, 29, 0.5); }
+
+[data-theme="light"] .alloy-tabs { background: rgba(10, 16, 22, 0.05); }
+[data-theme="light"] .alloy-tab { color: rgba(18, 24, 29, 0.55); }
+[data-theme="light"] .alloy-tab-active { background: #ffffff; color: #12181d; box-shadow: 0 1px 4px rgba(20, 30, 40, 0.15); }
+[data-theme="light"] .alloy-underline-tabs { border-color: rgba(10, 16, 22, 0.1); }
+[data-theme="light"] .alloy-underline-tab { color: rgba(18, 24, 29, 0.5); }
+[data-theme="light"] .alloy-underline-tab-active { color: #12181d; border-color: #12181d; }
+
+[data-theme="light"] .alloy-row { border-color: rgba(10, 16, 22, 0.08); }
+[data-theme="light"] .alloy-row-k { color: rgba(18, 24, 29, 0.55); }
+[data-theme="light"] .alloy-row-v { color: #12181d; }
+
+[data-theme="light"] .alloy-table { border-color: rgba(10, 16, 22, 0.1); background: linear-gradient(172deg, #ffffff, #f3f5f7); }
+[data-theme="light"] .alloy-table-head { border-color: rgba(10, 16, 22, 0.09); color: rgba(18, 24, 29, 0.5); }
+[data-theme="light"] .alloy-table-row { border-color: rgba(10, 16, 22, 0.07); }
+[data-theme="light"] .alloy-table-row.clickable:hover { background: rgba(10, 16, 22, 0.035); }
+
+[data-theme="light"] .alloy-chip { border-color: rgba(10, 16, 22, 0.16); background: rgba(10, 16, 22, 0.04); color: #12181d; }
+[data-theme="light"] .alloy-chip:hover { background: rgba(10, 16, 22, 0.08); }
+[data-theme="light"] .alloy-chip.active { border-color: rgba(18, 24, 29, 0.5); background: rgba(18, 24, 29, 0.1); color: #12181d; }
+
+[data-theme="light"] .alloy-icon-tile { background: repeating-linear-gradient(45deg, rgba(10, 16, 22, 0.06) 0 5px, rgba(10, 16, 22, 0.02) 5px 10px); border-color: rgba(10, 16, 22, 0.13); }
+
+[data-theme="light"] .alloy-rank-n { color: rgba(18, 24, 29, 0.4); }
+[data-theme="light"] .alloy-empty { color: rgba(18, 24, 29, 0.5); }
+
+/* ---------- Home dashboard (leaderboard / feed) ---------- */
+[data-theme="light"] .alloy-home-panel-title { color: #12181d; }
+
+[data-theme="light"] .alloy-lb-coin-row { border-color: rgba(10, 16, 22, 0.08); background: rgba(10, 16, 22, 0.015); }
+[data-theme="light"] .alloy-lb-coin-row:hover { border-color: rgba(10, 16, 22, 0.2); background: rgba(10, 16, 22, 0.035); }
+[data-theme="light"] .alloy-lb-coin-bar-track { background: rgba(10, 16, 22, 0.08); }
+[data-theme="light"] .alloy-lb-coin-bar-fill { background: linear-gradient(90deg, #3a424a, #6b747d 45%, #4c5560 62%, #232a30); }
+
+[data-theme="light"] .alloy-pnl-row:hover { background: rgba(10, 16, 22, 0.04); }
+[data-theme="light"] .alloy-pnl-row::before { mix-blend-mode: multiply; opacity: 0; }
+[data-theme="light"] .alloy-pnl-row:hover::before { opacity: 0.3; }
+[data-theme="light"] .alloy-pnl-name { color: #12181d; }
+
+[data-theme="light"] .alloy-trend-row:hover { background: rgba(10, 16, 22, 0.04); }
+[data-theme="light"] .alloy-trend-name { color: #12181d; }
+[data-theme="light"] .alloy-trend-sub { color: rgba(18, 24, 29, 0.45); }
+[data-theme="light"] .alloy-trend-mcap { color: rgba(18, 24, 29, 0.6); }
+
+[data-theme="light"] .alloy-callout-card { border-color: rgba(10, 16, 22, 0.09); background: rgba(10, 16, 22, 0.02); }
+[data-theme="light"] .alloy-callout-name { color: #12181d; }
+[data-theme="light"] .alloy-callout-time { color: rgba(18, 24, 29, 0.45); }
+[data-theme="light"] .alloy-callout-body { color: #1c242b; }
+[data-theme="light"] .alloy-callout-token { border-color: rgba(10, 16, 22, 0.09); background: rgba(10, 16, 22, 0.025); }
+[data-theme="light"] .alloy-callout-token-name { color: #12181d; }
+[data-theme="light"] .alloy-callout-token-sub { color: rgba(18, 24, 29, 0.5); }
+[data-theme="light"] .alloy-callout-action { color: rgba(18, 24, 29, 0.55); }
+[data-theme="light"] .alloy-callout-action:hover { color: #12181d; }
+[data-theme="light"] .alloy-callout-replies { border-color: rgba(10, 16, 22, 0.08); }
+
+/* ---------- Profile page ---------- */
+[data-theme="light"] .alloy-profile-banner { background: linear-gradient(135deg, #eef1f4, #ffffff 55%, #eef1f4); border-color: rgba(10, 16, 22, 0.1); }
+[data-theme="light"] .alloy-profile-banner-empty { border-color: rgba(18, 24, 29, 0.28); background: rgba(10, 16, 22, 0.02); color: rgba(18, 24, 29, 0.55); }
+[data-theme="light"] .alloy-profile-banner-empty:hover { border-color: rgba(18, 24, 29, 0.55); color: #12181d; background: rgba(10, 16, 22, 0.04); }
+[data-theme="light"] .alloy-banner-menu { background: #ffffff; border-color: rgba(10, 16, 22, 0.12); box-shadow: 0 16px 40px rgba(20, 30, 40, 0.18); }
+[data-theme="light"] .alloy-banner-menu-upload { background: rgba(10, 16, 22, 0.03); border-color: rgba(10, 16, 22, 0.1); color: #12181d; }
+[data-theme="light"] .alloy-banner-menu-upload:hover { border-color: rgba(18, 24, 29, 0.4); }
+[data-theme="light"] .alloy-banner-menu-label { color: rgba(18, 24, 29, 0.5); }

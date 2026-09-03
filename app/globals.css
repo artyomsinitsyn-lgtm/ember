@@ -1,26 +1,566 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Alloy Launchpad palette — near-black chrome surfaces, muted steel-blue text, applied
+     site-wide (previously landing-only). Values match app/landing.css's .alloy-page ramp
+     so the marketing page and the app dashboard are the same design, not look-alikes. */
+  --bg: #080b0e;
+  --bg-elevated: #11151a;
+  --bg-card: #151a20;
+  --border: rgba(255, 255, 255, 0.1);
+  --text: #eef2f7;
+  --text-dim: #8b96a6;
+  --accent: #8bc3ab;
+  --accent-dim: #1a2b24;
+  --up: #8bc3ab;
+  --down: #c98a8a;
+
+  /* Chrome/foil ramp — extracted verbatim from the landing page's metal gradient so every
+     page's primary CTA and prism-card sheen use the exact same values, not a look-alike. */
+  --chrome-1: #f0f4f8;
+  --chrome-2: #dae2ea;
+  --chrome-3: #a8b3bf;
+  --chrome-4: #e9eff4;
+  --chrome-5: #c3ccd6;
+  --chrome-text: #0d1216;
+}
+
+/* Light theme (/settings, lib/settings.ts) — same tokens, reread by every Tailwind utility
+   generated from the @theme inline block below (bg-bg, text-text-dim, border-border, text-up/
+   down, bg-accent, ...), so every dashboard page built from those utilities re-themes for
+   free. The chrome ramp flips from light-metal-on-dark to dark-graphite-on-light so gradient
+   text/buttons still read as "brushed metal", just lit from the other side. app/landing.css
+   carries its own [data-theme="light"] overrides for the hand-styled marketing/nav chrome
+   that predates this token system and doesn't read these variables directly. */
+:root[data-theme="light"] {
+  --bg: #eef1f4;
+  --bg-elevated: #ffffff;
+  --bg-card: #ffffff;
+  --border: rgba(10, 16, 22, 0.12);
+  --text: #12181d;
+  --text-dim: #5a6570;
+  --accent: #3f8f6b;
+  --accent-dim: #dcefe6;
+  --up: #2f7a57;
+  --down: #b23c3c;
+
+  --chrome-1: #2b3138;
+  --chrome-2: #454c54;
+  --chrome-3: #6d7680;
+  --chrome-4: #363c43;
+  --chrome-5: #565f68;
+  --chrome-text: #f5f7f9;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-card: var(--bg-card);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-dim: var(--text-dim);
+  --color-accent: var(--accent);
+  --color-accent-dim: var(--accent-dim);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --font-sans: var(--alloy-body);
+  --font-heading: var(--alloy-body);
+  --font-display: var(--alloy-display);
+  --font-mono: var(--alloy-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading), sans-serif;
+  letter-spacing: -0.01em;
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.mono {
+  font-family: var(--font-geist-mono), monospace;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+
+/* GraduatedChip's background shine — always-on (not hover-triggered, unlike btn-shine below),
+   confined to the chip's own rounded-full background via the parent's overflow-hidden, so
+   the chip itself never moves or resizes. rgba values are the dark-mode --up green; the
+   light-theme override recolors to the light --up so the sweep still reads as the same
+   accent green in either theme. */
+.alloy-grad-chip-shine {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 30%, rgba(139, 195, 171, 0.4) 50%, transparent 70%);
+  background-size: 220% 220%;
+  animation: al-grad-shine 5s ease-in-out infinite;
+}
+@keyframes al-grad-shine {
+  0% { background-position: -60% -60%; }
+  55% { background-position: 160% 160%; }
+  100% { background-position: 160% 160%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .alloy-grad-chip-shine { animation: none; }
+}
+:root[data-theme="light"] .alloy-grad-chip-shine {
+  background: linear-gradient(115deg, transparent 30%, rgba(63, 143, 107, 0.35) 50%, transparent 70%);
+}
+
+/* Gloss sweep: a soft diagonal highlight that travels across the button on hover.
+   Used on primary trade/action CTAs — cheap, tasteful, doesn't fight the accent color. */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.btn-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  left: -75%;
+  width: 50%;
+  border-radius: inherit;
+  background: linear-gradient(115deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.btn-shine:hover::after {
+  left: 125%;
+}
+
+/* Holo: a slow, low-opacity iridescent film restricted to a handful of "premium" actions
+   (connect wallet, launch, graduated badge) — blended with soft-light so it reads as a
+   sheen rather than a rainbow. Deliberately subtle per "not super colorful". */
+.btn-holo {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  /* Belt-and-suspenders clip: overflow:hidden + this element's own (inherited) border-radius
+     is the clip that the comment below already found imperfect — on an oval/pill badge
+     Chromium can round the two ends by a hair less than the rest, letting a faint square
+     corner of the spinning gradient poke through. clip-path's rounding doesn't share that
+     rasterization path, so pairing it in fixes the corner without reintroducing the
+     blur-vs-contain tradeoff described below. */
+  clip-path: inset(0 round 999px);
+}
+.btn-holo::before {
+  content: "";
+  position: absolute;
+  inset: -60%;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg,
+    #cfe8ff,
+    #ffffff,
+    #b8d9f5,
+    #dceeff,
+    #9fc9ec,
+    #cfe8ff
+  );
+  opacity: 0.18;
+  mix-blend-mode: soft-light;
+  animation: holo-spin 7s linear infinite;
+  /* No filter/blur here on purpose: a blurred descendant clipped by this element's own
+     overflow:hidden can miss the rounded corner by a hair in Chromium and let a faint
+     square glow poke past the pill shape. `contain: paint` "fixes" that clip but also
+     clips this element's OWN box-shadow (e.g. .glow-hover's pulse) into a hard square —
+     worse trade. The conic-gradient's stops are already soft, so no blur is needed. */
+}
+.btn-holo:hover::before {
+  opacity: 0.26;
+}
+.btn-holo > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes holo-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Chrome primary CTA — the exact button treatment from the landing page's "Launch a coin"
+   button, reused for the site's other top-priority conversion actions (board + create) so
+   the same action looks like the same button everywhere, not a lookalike recreation. */
+.btn-chrome {
+  color: var(--chrome-text) !important;
+  background: linear-gradient(
+    180deg,
+    var(--chrome-1) 0%,
+    var(--chrome-2) 38%,
+    var(--chrome-3) 52%,
+    var(--chrome-4) 68%,
+    var(--chrome-5) 100%
+  );
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.25) inset,
+    0 8px 20px rgba(0, 0, 0, 0.28);
+}
+.btn-chrome:hover {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.25) inset,
+    0 10px 26px rgba(0, 0, 0, 0.34);
+}
+
+/* Prism card — pointer-tracked holographic tilt + sheen. The component sets --px/--py
+   (sheen position, 0-100%) and --rx/--ry (tilt angle) directly via ref.current.style,
+   never through React state, so hovering never triggers a re-render. Disabled outright
+   under prefers-reduced-motion in the component (listeners are never attached) and here
+   as a hard CSS fallback in case a card is server-rendered before that check runs. */
+.prism-card {
+  --px: 50%;
+  --py: 50%;
+  --rx: 0deg;
+  --ry: 0deg;
+  position: relative;
+  transform: perspective(900px) rotateX(var(--rx)) rotateY(var(--ry));
+  /* Short on purpose: JS sets a new target angle on every pointermove, so any longer
+     duration here means the tilt is always chasing a moving target — that reads as lag,
+     not smoothness. 90ms is short enough to feel 1:1 with the cursor but still softens
+     raw mouse jitter and gives the leave-reset a small, deliberate snap. */
+  transition: transform 0.09s ease-out;
+  transform-style: preserve-3d;
+}
+.prism-card-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  background: radial-gradient(
+    280px circle at var(--px) var(--py),
+    rgba(255, 255, 255, 0.18),
+    rgba(200, 225, 255, 0.07) 42%,
+    transparent 72%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prism-card {
+    transform: none !important;
+    transition: none;
+  }
+  .prism-card-sheen {
+    display: none;
+  }
+}
+
+/* The default sheen is a white radial highlight, meant to catch light on a dark card — on a
+   light card (light theme) a white-on-white wash is nearly invisible, so it flips to a soft
+   dark tint instead, same idea as a highlight but reading as a shadow-side sheen. */
+:root[data-theme="light"] .prism-card-sheen {
+  background: radial-gradient(
+    280px circle at var(--px) var(--py),
+    rgba(10, 20, 30, 0.1),
+    rgba(20, 40, 60, 0.04) 42%,
+    transparent 72%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-holo::before {
+    animation: none;
+  }
+  .btn-shine::after {
+    transition: none;
+  }
+  .glow-hover:hover {
+    animation: none;
+  }
+}
+
+/* Animated glow: a soft pulsing halo on hover, used broadly on buttons, links, and the
+   wallet-name trigger that opens the mini profile popup. Color is a CSS var so buy/sell
+   and other semantic buttons can recolor it via the .glow-up / .glow-down modifiers. */
+.glow-hover {
+  --glow-color: var(--accent);
+  transition: box-shadow 0.2s ease;
+}
+.glow-hover:hover {
+  animation: glow-pulse 1.6s ease-in-out infinite;
+}
+.glow-up {
+  --glow-color: var(--up);
+}
+.glow-down {
+  --glow-color: var(--down);
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--glow-color) 45%, transparent),
+      0 0 14px 2px color-mix(in srgb, var(--glow-color) 30%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--glow-color) 65%, transparent),
+      0 0 24px 6px color-mix(in srgb, var(--glow-color) 50%, transparent);
+  }
+}
+
+/* Click effect: a quick tactile press — scale-down plus a brightness flash. Uses transform
+   + filter rather than an overlay pseudo-element, so it composes cleanly with .btn-shine
+   and .btn-holo (which already occupy ::after / ::before) instead of fighting them for the
+   same box — that collision was the cause of square corners showing through oval buttons. */
+.press-effect {
+  transition:
+    transform 0.1s ease,
+    filter 0.1s ease;
+}
+.press-effect:active {
+  transform: scale(0.96);
+  filter: brightness(1.2);
+}
+
+/* Dark-theme the Solana wallet modal to match Ember instead of its default light UI. */
+.wallet-adapter-modal-wrapper {
+  background: var(--bg-card) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
+}
+.wallet-adapter-modal-title {
+  color: var(--text) !important;
+}
+/* The library only ships the bare "You'll need a wallet on Solana to continue" title —
+   this appends the auto-detect note right under it via generated content, since that
+   markup comes from @solana/wallet-adapter-react-ui itself and isn't ours to edit directly. */
+.wallet-adapter-modal-title::after {
+  content: "We auto-detect any wallet already installed and connected in this browser — just pick it below.";
+  display: block;
+  margin-top: 10px;
+  font-family: var(--alloy-body), sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--text-dim) !important;
+}
+.wallet-adapter-modal-overlay {
+  background: rgba(0, 0, 0, 0.7) !important;
+}
+.wallet-adapter-modal-button-close {
+  background: var(--bg-elevated) !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button {
+  background: var(--bg-elevated) !important;
+  color: var(--text) !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button:hover {
+  background: var(--accent-dim) !important;
+  color: var(--accent) !important;
+}
+.wallet-adapter-modal-list-more {
+  color: var(--text-dim) !important;
+}
+.wallet-adapter-modal-list-more svg path {
+  stroke: var(--text-dim) !important;
+}
+/* Injected by components/WalletManualLink.tsx — see that file for why this isn't plain JSX. */
+.alloy-wallet-manual-link {
+  display: block;
+  text-align: center;
+  margin: 4px 24px 24px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: var(--alloy-body), sans-serif;
+  font-size: 13px;
+  color: var(--text-dim);
+  text-decoration: none;
+}
+.alloy-wallet-manual-link:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+/* Aurora hero: a few large blurred blobs drifting slowly behind the headline on the
+   /token page. Pure CSS, honestly a generated visual effect — not styled to pass as
+   filmed footage or to obscure what it is. */
+.aurora-hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.aurora-hero::before,
+.aurora-hero::after,
+.aurora-hero .aurora-blob {
+  content: "";
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(70px);
+  opacity: 0.55;
+  z-index: -1;
+  will-change: transform;
+}
+.aurora-hero::before {
+  width: 55%;
+  height: 140%;
+  top: -30%;
+  left: -15%;
+  background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+  animation: aurora-drift-a 18s ease-in-out infinite;
+}
+.aurora-hero::after {
+  width: 45%;
+  height: 120%;
+  top: -10%;
+  right: -10%;
+  background: radial-gradient(circle, var(--up) 0%, transparent 70%);
+  opacity: 0.28;
+  animation: aurora-drift-b 22s ease-in-out infinite;
+}
+.aurora-hero .aurora-blob {
+  width: 40%;
+  height: 100%;
+  bottom: -40%;
+  left: 30%;
+  background: radial-gradient(circle, #cfd8e3 0%, transparent 70%);
+  opacity: 0.22;
+  animation: aurora-drift-c 26s ease-in-out infinite;
+}
+
+@keyframes aurora-drift-a {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(6%, 8%) scale(1.15);
+  }
+}
+@keyframes aurora-drift-b {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-8%, 6%) scale(1.1);
+  }
+}
+@keyframes aurora-drift-c {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(4%, -10%) scale(1.2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-hero::before,
+  .aurora-hero::after,
+  .aurora-hero .aurora-blob {
+    animation: none;
+  }
+}
+
+/* Site-wide custom cursor (CursorFx, mounted in the root layout). The native OS cursor
+   must never be visible, anywhere, under any circumstance — so this is a blanket,
+   unconditional `cursor: none` on every element, not gated behind a JS-added class or a
+   prefers-reduced-motion check. Unconditional on purpose: with dozens of `cursor: pointer`
+   declarations scattered across this file (buttons, table rows, chips, drag zones, third-
+   party wallet-adapter styles, ...), trying to track down and override every one
+   individually is exactly the kind of gap that keeps letting the native cursor flash
+   through; `!important` on the universal selector beats all of them at once, regardless
+   of specificity or load order, and isn't gated behind JS mounting so there's no flash of
+   native cursor on first paint either. CursorFx.tsx still checks prefers-reduced-motion,
+   but only to skip its own extra motion (click-burst particles, magnet pull, page shake) —
+   the base cursor dot always renders and always tracks the pointer 1:1.
+   The one thing this genuinely cannot reach: an actually-native OS-drawn popup (an open
+   <select> dropdown list, a browser autofill suggestion list, a print dialog) or a
+   cross-origin iframe's own document — both live outside any page's CSS/JS entirely. */
+* {
+  cursor: none !important;
+}
+
+/* Performance Mode (/settings, lib/settings.ts) — strips every continuous decorative CSS
+   animation/transition site-wide: the marquee ticker, sheen sweeps, ambient glow, prism-card
+   tilt easing, page-enter stagger, etc. `animation: none` cleanly removes the animation and
+   falls back to the property's un-animated computed value (not the keyframe's `from` state),
+   so nothing gets stuck invisible — same behavior the handful of existing scoped
+   prefers-reduced-motion overrides already rely on, just applied blanket. JS-driven motion
+   (CursorFx's magnet pull/burst particles, AmbientGlow's cursor-follow drift, PrismCard's
+   pointer tilt) is skipped separately via prefersReducedMotion() (lib/pointerFx.ts), which
+   also checks for this class. */
+html.perf-mode *,
+html.perf-mode *::before,
+html.perf-mode *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+@keyframes al-ring {
+  from { transform: translate(-50%, -50%) scale(0.15); opacity: 0.55; }
+  to { transform: translate(-50%, -50%) scale(2.1); opacity: 0; }
+}
+@keyframes al-shard {
+  to { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(0.2); opacity: 0; }
+}
+@keyframes al-shake {
+  25% { transform: translate(1px, -0.5px); }
+  50% { transform: translate(-1.5px, 0.5px); }
+  75% { transform: translate(1px, 0.5px); }
+}
+
+/* Route entrance (components/PageTransition.tsx): the page swap itself is instant — no
+   whole-page slide or fade, so there's never a moment where nothing is on screen. Instead,
+   PageTransition remounts a wrapper keyed by pathname, and that wrapper's direct children
+   (the page's top-level sections/blocks) cascade in with a staggered fade + rise, the same
+   "content builds in piece by piece" reveal apple.com uses on its product pages. */
+.page-enter-stagger > * {
+  animation: al-page-in 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.page-enter-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.page-enter-stagger > *:nth-child(2) { animation-delay: 70ms; }
+.page-enter-stagger > *:nth-child(3) { animation-delay: 140ms; }
+.page-enter-stagger > *:nth-child(4) { animation-delay: 210ms; }
+.page-enter-stagger > *:nth-child(5) { animation-delay: 280ms; }
+.page-enter-stagger > *:nth-child(6) { animation-delay: 350ms; }
+.page-enter-stagger > *:nth-child(n+7) { animation-delay: 400ms; }
+@keyframes al-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-stagger > * {
+    animation: none;
+  }
 }
