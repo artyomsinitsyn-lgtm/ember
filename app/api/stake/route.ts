@@ -14,9 +14,8 @@ export async function GET() {
   const pool = db
     .prepare("SELECT total_staked, acc_core_per_embr, lifetime_core_distributed FROM reward_pool WHERE id = 1")
     .get();
-  const onchainStakerPoolLamports = await getConnection()
-    .getBalance(stakerPoolPda())
-    .catch(() => null);
+  const connection = await getConnection();
+  const onchainStakerPoolLamports = await connection.getBalance(stakerPoolPda()).catch(() => null);
   return NextResponse.json({ pool, onchainStakerPoolLamports });
 }
 

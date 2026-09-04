@@ -7,7 +7,7 @@ import { fetchTreasuryState } from "./onchain/treasury";
  * check is the real enforcement, this is just for showing/hiding the withdraw UI. */
 export async function isTreasuryAdmin(walletId: string): Promise<boolean> {
   if (!walletId) return false;
-  const { admin } = await fetchTreasuryState(getConnection());
+  const { admin } = await fetchTreasuryState(await getConnection());
   return admin === walletId;
 }
 

@@ -2,6 +2,20 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { getSessionWalletId } from "@/lib/auth";
 import { isAppAdmin } from "@/lib/admin";
+import { decryptPII } from "@/lib/pii";
+
+/** `wallets.contact` is stored encrypted (see lib/pii.ts). Rows written before encryption
+ * was introduced, if any, aren't valid ciphertext — decrypt defensively rather than 500 the
+ * whole admin screen over one bad row. */
+function safeDecryptContact(contact: string | null): string | null {
+  if (!contact) return contact;
+  try {
+    return decryptPII(contact);
+  } catch {
+    console.warn("[admin/verifications] failed to decrypt a contact value — returning as-is");
+    return contact;
+  }
+}
 
 export async function GET() {
   const walletId = await getSessionWalletId();
@@ -41,7 +55,7 @@ export async function GET() {
       decidedAt: r.decided_at,
       walletName: r.wallet_name,
       walletAvatar: r.wallet_avatar,
-      contact: r.contact,
+      contact: safeDecryptContact(r.contact),
       contactType: r.contact_type,
       twitterHandle: r.twitter_handle,
     })),

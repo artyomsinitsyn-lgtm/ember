@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, alreadyRecorded: true });
   }
 
-  const connection = getConnection();
+  const connection = await getConnection();
   const tx = await connection.getTransaction(signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 });
   if (!tx || tx.meta?.err) {
     return NextResponse.json({ error: "Transaction not found or failed on-chain" }, { status: 400 });

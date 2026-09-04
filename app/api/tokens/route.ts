@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "A real on-chain mint address is required" }, { status: 400 });
   }
-  const onchainCurve = await fetchCurveState(getConnection(), mintAddress);
+  const onchainCurve = await fetchCurveState(await getConnection(), mintAddress);
   if (!onchainCurve) {
     return NextResponse.json(
       { error: "No bonding curve found on-chain for that mint — initialize_curve must be confirmed first" },

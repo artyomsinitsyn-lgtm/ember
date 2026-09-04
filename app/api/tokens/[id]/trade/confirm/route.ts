@@ -35,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Connect a real wallet first" }, { status: 401 });
   }
 
-  const connection = getConnection();
+  const connection = await getConnection();
   const tx = await connection.getTransaction(signature, { commitment: "confirmed", maxSupportedTransactionVersion: 0 });
   if (!tx || tx.meta?.err) {
     return NextResponse.json({ error: "Transaction not found or failed on-chain" }, { status: 400 });

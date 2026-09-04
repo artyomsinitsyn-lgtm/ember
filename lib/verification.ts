@@ -1,6 +1,7 @@
 import { randomInt } from "crypto";
 import { getDb } from "./db";
 import { sendSms, sendEmail } from "./notifications";
+import { encryptPII, decryptPII } from "./pii";
 
 const CODE_TTL_MS = 10 * 60 * 1000;
 
@@ -28,7 +29,13 @@ export async function requestVerificationCode(
        contact_type = excluded.contact_type,
        code = excluded.code,
        expires_at = excluded.expires_at`
-  ).run({ wallet_id: walletId, contact, contact_type: contactType, code, expires_at: expiresAt });
+  ).run({
+    wallet_id: walletId,
+    contact: encryptPII(contact),
+    contact_type: contactType,
+    code: encryptPII(code),
+    expires_at: expiresAt,
+  });
 
   const message = `Your Alloy verification code is ${code}. It expires in 10 minutes.`;
   const result =
@@ -44,10 +51,10 @@ export function confirmVerificationCode(walletId: string, code: string): { ok: b
     | undefined;
   if (!row) return { ok: false, error: "No verification code requested yet." };
   if (Date.now() > row.expires_at) return { ok: false, error: "Code expired, request a new one." };
-  if (row.code !== code.trim()) return { ok: false, error: "Incorrect code." };
+  if (decryptPII(row.code) !== code.trim()) return { ok: false, error: "Incorrect code." };
 
   db.prepare("UPDATE wallets SET contact = ?, contact_type = ?, contact_verified_at = ? WHERE id = ?").run(
-    row.contact,
+    row.contact, // already encrypted — carried over as-is from verification_codes, not re-encrypted
     row.contact_type,
     Date.now(),
     walletId
