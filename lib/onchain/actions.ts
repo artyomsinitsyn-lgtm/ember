@@ -99,3 +99,36 @@ export async function buildWithdrawTreasuryTx(
     .instruction();
   return new Transaction().add(ix);
 }
+
+/** One-time bootstrap — the caller becomes the emergency (pause/unpause) authority.
+ * Deliberately separate from treasury admin: the point of a kill switch is being able to
+ * fire it without treasury/multisig quorum. Only TREASURY_ADMIN can call this once, at
+ * platform setup. */
+export async function buildInitializeEmergencyConfigTx(program: Program<AlloyCurve>, admin: PublicKey): Promise<Transaction> {
+  const ix = await program.methods.initializeEmergencyConfig().accounts({ admin }).instruction();
+  return new Transaction().add(ix);
+}
+
+/** Hands the emergency (pause/unpause) authority off to `newAuthority` — e.g. rotating from
+ * the treasury's hardware wallet to a faster-reacting hot ops key. Does not touch treasury
+ * custody. Only the current emergency authority's signature will pass the program check. */
+export async function buildSetEmergencyAdminTx(
+  program: Program<AlloyCurve>,
+  authority: PublicKey,
+  newAuthority: PublicKey
+): Promise<Transaction> {
+  const ix = await program.methods.setEmergencyAdmin(newAuthority).accounts({ authority }).instruction();
+  return new Transaction().add(ix);
+}
+
+/** Halts initialize_curve/buy/sell platform-wide. Callable by the emergency authority alone. */
+export async function buildPauseTx(program: Program<AlloyCurve>, authority: PublicKey): Promise<Transaction> {
+  const ix = await program.methods.pause().accounts({ authority }).instruction();
+  return new Transaction().add(ix);
+}
+
+/** Resumes trading/minting after a pause. Same authority as pause(). */
+export async function buildUnpauseTx(program: Program<AlloyCurve>, authority: PublicKey): Promise<Transaction> {
+  const ix = await program.methods.unpause().accounts({ authority }).instruction();
+  return new Transaction().add(ix);
+}

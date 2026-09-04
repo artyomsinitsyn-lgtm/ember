@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pause": "node scripts/emergency-pause.mjs pause",
+    "unpause": "node scripts/emergency-pause.mjs unpause",
+    "pause:status": "node scripts/emergency-pause.mjs status"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",

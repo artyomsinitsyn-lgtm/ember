@@ -33,8 +33,13 @@ pub const BPS_DENOM: u64 = 10_000;
 // below (see `buy`/`sell`); this constant is who's allowed to claim admin over that PDA and
 // direct withdrawals out of it, so fee collection can't be front-run by whoever calls
 // `initialize_treasury_config` first.
+// PLACEHOLDER — this is a locally-generated dev keypair (treasury-wallet.json, gitignored), not
+// a real controlled wallet. Swap this for your hardware wallet's real pubkey before any devnet
+// or mainnet deployment; whoever holds this address's private key currently controls nothing
+// live, but would become the real treasury admin the moment this program is deployed and
+// initialize_treasury_config/initialize_emergency_config are called on a real network.
 #[constant]
-pub const TREASURY_ADMIN: Pubkey = pubkey!("EQppLWkRjV9cwSKy2Z1z9DhWYq1jyVEM1nTATzjHw429");
+pub const TREASURY_ADMIN: Pubkey = pubkey!("9EujSJZEKXFWeaAYfRRacq6y9rjkTjLD2P3UcUtvGFqQ");
 
 const LAMPORTS_PER_SOL: u64 = 1_000_000_000;
 
@@ -43,6 +48,7 @@ const SOL_VAULT_SEED: &[u8] = b"sol_vault";
 const TREASURY_SEED: &[u8] = b"treasury";
 const TREASURY_CONFIG_SEED: &[u8] = b"treasury_config";
 const STAKER_POOL_SEED: &[u8] = b"staker_pool";
+const EMERGENCY_CONFIG_SEED: &[u8] = b"emergency_config";
 
 #[program]
 pub mod alloy_curve {
@@ -53,6 +59,7 @@ pub mod alloy_curve {
     /// already made in the UI), and initializes the bonding curve at pump.fun's real starting
     /// reserves.
     pub fn initialize_curve(ctx: Context<InitializeCurve>) -> Result<()> {
+        require!(!ctx.accounts.emergency_config.paused, CurveError::TradingPaused);
         let curve = &mut ctx.accounts.curve;
 
         token::mint_to(
@@ -97,6 +104,7 @@ pub mod alloy_curve {
     }
 
     pub fn buy(ctx: Context<Trade>, sol_in: u64, min_tokens_out: u64) -> Result<()> {
+        require!(!ctx.accounts.emergency_config.paused, CurveError::TradingPaused);
         require!(sol_in > 0, CurveError::ZeroAmount);
         let curve_account_info = ctx.accounts.curve.to_account_info();
         let curve = &mut ctx.accounts.curve;
@@ -187,6 +195,7 @@ pub mod alloy_curve {
     }
 
     pub fn sell(ctx: Context<Trade>, tokens_in: u64, min_sol_out: u64) -> Result<()> {
+        require!(!ctx.accounts.emergency_config.paused, CurveError::TradingPaused);
         require!(tokens_in > 0, CurveError::ZeroAmount);
         let curve = &mut ctx.accounts.curve;
         // sell() never flips `graduated`, so reading it once up front is safe either way.
@@ -290,6 +299,50 @@ pub mod alloy_curve {
         emit!(TreasuryWithdrawn { to: ctx.accounts.to.key(), amount });
         Ok(())
     }
+
+    /// One-time bootstrap, same pattern as `initialize_treasury_config`: only `TREASURY_ADMIN`
+    /// can call this, and doing so makes it the emergency-pause authority. Deliberately a
+    /// separate config/authority from `treasury_config` — the whole point of a kill switch is
+    /// that whoever can trigger it doesn't need to go through multisig/treasury quorum to react
+    /// in an emergency, so its authority has to be independently held and independently
+    /// rotatable via `set_emergency_admin` (e.g. to a faster-reacting hot key) without that
+    /// change ever touching treasury custody.
+    pub fn initialize_emergency_config(ctx: Context<InitializeEmergencyConfig>) -> Result<()> {
+        let config = &mut ctx.accounts.emergency_config;
+        config.authority = ctx.accounts.admin.key();
+        config.paused = false;
+        config.bump = ctx.bumps.emergency_config;
+        emit!(EmergencyAdminChanged { new_authority: config.authority });
+        Ok(())
+    }
+
+    /// Hands the pause authority to a different wallet (e.g. a hot ops key instead of the
+    /// treasury's hardware wallet, so pausing doesn't require digging out cold storage during
+    /// an incident). Only the current emergency authority can do this.
+    pub fn set_emergency_admin(ctx: Context<SetEmergencyAdmin>, new_authority: Pubkey) -> Result<()> {
+        require_keys_eq!(ctx.accounts.emergency_config.authority, ctx.accounts.authority.key(), CurveError::Unauthorized);
+        ctx.accounts.emergency_config.authority = new_authority;
+        emit!(EmergencyAdminChanged { new_authority });
+        Ok(())
+    }
+
+    /// Halts `initialize_curve`, `buy`, and `sell` platform-wide. Callable by the emergency
+    /// authority alone — no treasury/multisig quorum needed, so it can fire the moment an
+    /// exploit or drain is spotted.
+    pub fn pause(ctx: Context<SetPaused>) -> Result<()> {
+        require_keys_eq!(ctx.accounts.emergency_config.authority, ctx.accounts.authority.key(), CurveError::Unauthorized);
+        ctx.accounts.emergency_config.paused = true;
+        emit!(EmergencyPauseToggled { paused: true });
+        Ok(())
+    }
+
+    /// Resumes trading/minting after a pause. Same authority as `pause`.
+    pub fn unpause(ctx: Context<SetPaused>) -> Result<()> {
+        require_keys_eq!(ctx.accounts.emergency_config.authority, ctx.accounts.authority.key(), CurveError::Unauthorized);
+        ctx.accounts.emergency_config.paused = false;
+        emit!(EmergencyPauseToggled { paused: false });
+        Ok(())
+    }
 }
 
 struct FeeSplit {
@@ -367,6 +420,17 @@ impl TreasuryConfig {
     pub const SPACE: usize = 8 + 32 + 1;
 }
 
+#[account]
+pub struct EmergencyConfig {
+    pub authority: Pubkey,
+    pub paused: bool,
+    pub bump: u8,
+}
+
+impl EmergencyConfig {
+    pub const SPACE: usize = 8 + 32 + 1 + 1;
+}
+
 #[derive(Accounts)]
 pub struct InitializeCurve<'info> {
     #[account(mut)]
@@ -400,6 +464,9 @@ pub struct InitializeCurve<'info> {
     /// CHECK: PDA with no data, used purely as a lamport vault; ownership is enforced by seeds.
     #[account(mut, seeds = [SOL_VAULT_SEED, mint.key().as_ref()], bump)]
     pub sol_vault: UncheckedAccount<'info>,
+
+    #[account(seeds = [EMERGENCY_CONFIG_SEED], bump = emergency_config.bump)]
+    pub emergency_config: Account<'info, EmergencyConfig>,
 
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -451,9 +518,45 @@ pub struct Trade<'info> {
     #[account(mut, seeds = [TREASURY_SEED], bump)]
     pub treasury: UncheckedAccount<'info>,
 
+    #[account(seeds = [EMERGENCY_CONFIG_SEED], bump = emergency_config.bump)]
+    pub emergency_config: Account<'info, EmergencyConfig>,
+
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct InitializeEmergencyConfig<'info> {
+    #[account(mut, address = TREASURY_ADMIN @ CurveError::Unauthorized)]
+    pub admin: Signer<'info>,
+
+    #[account(
+        init,
+        payer = admin,
+        space = EmergencyConfig::SPACE,
+        seeds = [EMERGENCY_CONFIG_SEED],
+        bump,
+    )]
+    pub emergency_config: Account<'info, EmergencyConfig>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct SetEmergencyAdmin<'info> {
+    pub authority: Signer<'info>,
+
+    #[account(mut, seeds = [EMERGENCY_CONFIG_SEED], bump = emergency_config.bump)]
+    pub emergency_config: Account<'info, EmergencyConfig>,
+}
+
+#[derive(Accounts)]
+pub struct SetPaused<'info> {
+    pub authority: Signer<'info>,
+
+    #[account(mut, seeds = [EMERGENCY_CONFIG_SEED], bump = emergency_config.bump)]
+    pub emergency_config: Account<'info, EmergencyConfig>,
 }
 
 #[derive(Accounts)]
@@ -528,6 +631,16 @@ pub struct TreasuryWithdrawn {
     pub amount: u64,
 }
 
+#[event]
+pub struct EmergencyAdminChanged {
+    pub new_authority: Pubkey,
+}
+
+#[event]
+pub struct EmergencyPauseToggled {
+    pub paused: bool,
+}
+
 #[error_code]
 pub enum CurveError {
     #[msg("Amount must be greater than zero")]
@@ -540,4 +653,6 @@ pub enum CurveError {
     MathOverflow,
     #[msg("Signer is not the treasury admin")]
     Unauthorized,
+    #[msg("Trading and minting are currently paused")]
+    TradingPaused,
 }
