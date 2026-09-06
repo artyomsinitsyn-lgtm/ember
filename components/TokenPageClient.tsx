@@ -530,6 +530,8 @@ export default function TokenPageClient({ id }: { id: string }) {
             ticker={token.ticker}
             coreBalance={coreBalance}
             tokenBalance={tokenBalance}
+            curve={curve}
+            graduated={token.graduated}
             onTraded={load}
           />
         </div>
