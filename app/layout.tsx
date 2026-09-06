@@ -3,7 +3,6 @@ import { Anton, Chakra_Petch, IBM_Plex_Mono } from "next/font/google";
 import Providers from "./providers";
 import CursorFx from "@/components/CursorFx";
 import PresenceBeacon from "@/components/PresenceBeacon";
-import WalletManualLink from "@/components/WalletManualLink";
 import AlloyHeader from "@/components/AlloyHeader";
 import ClusterBanner from "@/components/ClusterBanner";
 import AlloyTicker from "@/components/AlloyTicker";
@@ -57,7 +56,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </Providers>
         <CursorFx />
         <PresenceBeacon />
-        <WalletManualLink />
       </body>
     </html>
   );

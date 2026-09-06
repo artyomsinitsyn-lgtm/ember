@@ -386,23 +386,6 @@ body {
 .wallet-adapter-modal-list-more svg path {
   stroke: var(--text-dim) !important;
 }
-/* Injected by components/WalletManualLink.tsx — see that file for why this isn't plain JSX. */
-.alloy-wallet-manual-link {
-  display: block;
-  text-align: center;
-  margin: 4px 24px 24px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  font-family: var(--alloy-body), sans-serif;
-  font-size: 13px;
-  color: var(--text-dim);
-  text-decoration: none;
-}
-.alloy-wallet-manual-link:hover {
-  color: var(--text);
-  text-decoration: underline;
-}
-
 /* Aurora hero: a few large blurred blobs drifting slowly behind the headline on the
    /token page. Pure CSS, honestly a generated visual effect — not styled to pass as
    filmed footage or to obscure what it is. */

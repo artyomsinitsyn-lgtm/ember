@@ -8,11 +8,13 @@ import { Copy, Check, KeySquare } from "lucide-react";
 type Step = "address" | "sign";
 
 /**
- * Not linked from the header/nav — reached only via the "or connect manually" link
- * WalletManualLink.tsx injects into the wallet-adapter modal. This is for wallets that
- * never registered with the Wallet Standard, so they never show up in that modal's list:
- * something driven from a CLI, a hardware wallet's own signing tool, a mobile wallet with
- * no WalletConnect configured, anything exotic.
+ * Deliberately not linked from anywhere in the normal UI — no header/nav entry, and no
+ * link from the wallet-adapter connect modal either. WalletConnect (see providers.tsx)
+ * now covers the case this used to paper over: Safari and anyone without a browser wallet
+ * extension. This page is a true fallback for what WalletConnect still can't reach —
+ * something driven from a CLI, a hardware wallet's own signing tool, anything that never
+ * registered with the Wallet Standard and has no WalletConnect support either. Reached
+ * only if someone already knows the URL (support pointing a user at it, docs, etc).
  *
  * It reuses the exact same /api/auth/nonce + /api/auth/verify pair the automatic wallet
  * flow uses — same ed25519 signature check server-side either way. There is no path here
