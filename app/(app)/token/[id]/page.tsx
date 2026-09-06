@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getDb } from "@/lib/db";
+import { getDb, dbGet } from "@/lib/db";
 import { serializeToken } from "@/lib/serialize";
 import { formatUsd } from "@/lib/format";
 import TokenPageClient from "@/components/TokenPageClient";
@@ -7,8 +7,8 @@ import type { TokenRow } from "@/lib/trading";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const db = getDb();
-  const row = db.prepare("SELECT * FROM tokens WHERE id = ?").get(id) as TokenRow | undefined;
+  const db = await getDb();
+  const row = await dbGet<TokenRow>(db, "SELECT * FROM tokens WHERE id = $1", [id]);
   if (!row) return { title: "Token not found | Alloy" };
 
   const token = serializeToken(row);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getDb, dbAll, dbRun } from "@/lib/db";
 import { getSessionWalletId } from "@/lib/auth";
 import { isAppAdmin } from "@/lib/admin";
 import { checkFeedbackRateLimit } from "@/lib/rateLimit";
@@ -14,15 +14,8 @@ export async function GET() {
     return NextResponse.json({ error: "Not the treasury admin" }, { status: 403 });
   }
 
-  const db = getDb();
-  const rows = db
-    .prepare(
-      `SELECT feedback.id, feedback.wallet_id, feedback.kind, feedback.message,
-              feedback.resolved_at, feedback.created_at, wallets.name as wallet_name
-       FROM feedback JOIN wallets ON wallets.id = feedback.wallet_id
-       ORDER BY (feedback.resolved_at IS NOT NULL) ASC, feedback.created_at DESC`
-    )
-    .all() as {
+  const db = await getDb();
+  const rows = await dbAll<{
     id: string;
     wallet_id: string;
     kind: string;
@@ -30,7 +23,13 @@ export async function GET() {
     resolved_at: number | null;
     created_at: number;
     wallet_name: string;
-  }[];
+  }>(
+    db,
+    `SELECT feedback.id, feedback.wallet_id, feedback.kind, feedback.message,
+            feedback.resolved_at, feedback.created_at, wallets.name as wallet_name
+     FROM feedback JOIN wallets ON wallets.id = feedback.wallet_id
+     ORDER BY (feedback.resolved_at IS NOT NULL) ASC, feedback.created_at DESC`
+  );
 
   return NextResponse.json({
     items: rows.map((r) => ({
@@ -57,16 +56,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Say a little more than that." }, { status: 400 });
   }
 
-  const db = getDb();
+  const db = await getDb();
   const walletId = await getSessionWalletId();
 
-  const rateLimit = checkFeedbackRateLimit(db, walletId);
+  const rateLimit = await checkFeedbackRateLimit(db, walletId);
   if (!rateLimit.ok) return NextResponse.json({ error: rateLimit.error }, { status: 429 });
 
   const id = `feedback_${crypto.randomUUID().slice(0, 10)}`;
-  db.prepare(
-    `INSERT INTO feedback (id, wallet_id, kind, message, created_at) VALUES (?, ?, ?, ?, ?)`
-  ).run(id, walletId, kind, message, Date.now());
+  await dbRun(db, `INSERT INTO feedback (id, wallet_id, kind, message, created_at) VALUES ($1, $2, $3, $4, $5)`, [
+    id,
+    walletId,
+    kind,
+    message,
+    Date.now(),
+  ]);
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }

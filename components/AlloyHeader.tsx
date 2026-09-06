@@ -12,10 +12,14 @@ import { LAMPORTS_PER_SOL } from "@/lib/onchain/program";
 import { useConnectedWalletId } from "@/lib/useConnectedWallet";
 import SiteSearch from "@/components/SiteSearch";
 
+// Every non-mainnet label spells out "test SOL" explicitly rather than just naming the
+// cluster — "DEVNET SOL" alone still reads as a kind of real SOL to someone unfamiliar with
+// Solana's cluster model. This is the one piece of copy a connected, about-to-trade user
+// actually looks at, so it has to be unambiguous on its own.
 function clusterLabel(rpcEndpoint: string): string {
-  if (rpcEndpoint.includes("127.0.0.1") || rpcEndpoint.includes("localhost")) return "LOCAL VALIDATOR";
-  if (rpcEndpoint.includes("devnet")) return "DEVNET SOL";
-  if (rpcEndpoint.includes("testnet")) return "TESTNET SOL";
+  if (rpcEndpoint.includes("127.0.0.1") || rpcEndpoint.includes("localhost")) return "LOCAL VALIDATOR · TEST SOL";
+  if (rpcEndpoint.includes("devnet")) return "DEVNET · TEST SOL";
+  if (rpcEndpoint.includes("testnet")) return "TESTNET · TEST SOL";
   return "MAINNET SOL";
 }
 
@@ -136,7 +140,7 @@ export default function AlloyHeader() {
         </Link>
         <div className="alloy-status-pill">
           <span className="alloy-status-dot" />
-          {connected ? `REAL TX · ${clusterLabel(connection.rpcEndpoint)}` : "SIMULATED LEDGER"}
+          {connected ? `ON-CHAIN TX · ${clusterLabel(connection.rpcEndpoint)}` : "SIMULATED LEDGER"}
         </div>
         {balances && (
           <div className="alloy-balance">

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getDb, dbAll } from "@/lib/db";
 
 const DAY_MS = 86_400_000;
 
@@ -14,21 +14,20 @@ interface DayRow {
 // treasuryFees is deliberately never selected here — the platform's own revenue shouldn't be
 // readable off a public API just because it happens to share a table with staker/creator fees.
 export async function GET() {
-  const db = getDb();
+  const db = await getDb();
 
-  const rows = db
-    .prepare(
-      `SELECT
-         CAST(created_at / ${DAY_MS} AS INTEGER) as dayBucket,
-         SUM(fee_staker) as stakerFees,
-         SUM(fee_creator) as creatorFees,
-         SUM(core_amount) as volume,
-         COUNT(*) as trades
-       FROM trades
-       GROUP BY dayBucket
-       ORDER BY dayBucket ASC`
-    )
-    .all() as DayRow[];
+  const rows = await dbAll<DayRow>(
+    db,
+    `SELECT
+       CAST(created_at / ${DAY_MS} AS INTEGER) as "dayBucket",
+       SUM(fee_staker) as "stakerFees",
+       SUM(fee_creator) as "creatorFees",
+       SUM(core_amount) as volume,
+       COUNT(*) as trades
+     FROM trades
+     GROUP BY "dayBucket"
+     ORDER BY "dayBucket" ASC`
+  );
 
   let cumulative = 0;
   const series = rows.map((r) => {

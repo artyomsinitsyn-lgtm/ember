@@ -75,6 +75,109 @@ fn init_emergency_config(svm: &mut LiteSVM) -> Pubkey {
     emergency_config
 }
 
+/// Regression test for a real bug found on devnet: `treasury` and `staker_pool` are bare
+/// system-owned PDAs that start at 0 lamports, and a fresh account can't receive a transfer that
+/// leaves it non-zero but below the rent-exempt minimum — which a normal-sized trade's tiny fee
+/// cut always is. `initialize_treasury_config` must fund both vaults past that minimum as part of
+/// the same one-time bootstrap call, so a deploy can't go live without it.
+#[test]
+fn treasury_config_bootstrap_funds_vaults_past_rent_exemption() {
+    let mut svm = LiteSVM::new();
+    svm.add_program(alloy_curve::ID, &program_bytes()).unwrap();
+
+    // Funds the shared TREASURY_ADMIN keypair (as a side effect) and sets up emergency_config,
+    // which InitializeCurve/Trade require regardless of treasury bootstrap order.
+    let emergency_config = init_emergency_config(&mut svm);
+    let admin = treasury_admin_keypair();
+
+    let (treasury_config, _) = Pubkey::find_program_address(&[b"treasury_config"], &alloy_curve::ID);
+    let (treasury, _) = treasury_pda();
+    let (staker_pool, _) = staker_pool_pda();
+
+    assert_eq!(svm.get_balance(&treasury).unwrap_or(0), 0, "treasury should start unfunded");
+    assert_eq!(svm.get_balance(&staker_pool).unwrap_or(0), 0, "staker_pool should start unfunded");
+
+    let accounts = alloy_curve::accounts::InitializeTreasuryConfig {
+        admin: admin.pubkey(),
+        treasury_config,
+        treasury,
+        staker_pool,
+        system_program: system_program::ID,
+    };
+    let ix = Instruction {
+        program_id: alloy_curve::ID,
+        accounts: accounts.to_account_metas(None),
+        data: alloy_curve::instruction::InitializeTreasuryConfig {}.data(),
+    };
+    let msg = Message::new(&[ix], Some(&admin.pubkey()));
+    let tx = Transaction::new(&[&admin], msg, svm.latest_blockhash());
+    svm.send_transaction(tx).expect("initialize_treasury_config failed");
+
+    let rent_exempt_min = svm.minimum_balance_for_rent_exemption(0);
+    assert!(svm.get_balance(&treasury).unwrap() >= rent_exempt_min, "treasury must be rent-exempt after bootstrap");
+    assert!(svm.get_balance(&staker_pool).unwrap() >= rent_exempt_min, "staker_pool must be rent-exempt after bootstrap");
+
+    // Prove the fix actually matters: a trade whose fee cut is smaller than the rent-exempt
+    // minimum must still succeed now that the vaults are pre-funded.
+    let creator = Keypair::new();
+    let buyer = Keypair::new();
+    svm.airdrop(&creator.pubkey(), 10_000_000_000).unwrap();
+    svm.airdrop(&buyer.pubkey(), 10_000_000_000).unwrap();
+
+    let mint = Keypair::new();
+    let (curve, _) = curve_pda(&mint.pubkey());
+    let (sol_vault, _) = sol_vault_pda(&mint.pubkey());
+    let curve_token_vault = get_associated_token_address(&curve, &mint.pubkey());
+
+    let init_accounts = alloy_curve::accounts::InitializeCurve {
+        creator: creator.pubkey(),
+        mint: mint.pubkey(),
+        curve,
+        curve_token_vault,
+        sol_vault,
+        emergency_config,
+        token_program: anchor_spl::token::ID,
+        associated_token_program: anchor_spl::associated_token::ID,
+        system_program: system_program::ID,
+        rent: rent::ID,
+    };
+    let init_ix = Instruction {
+        program_id: alloy_curve::ID,
+        accounts: init_accounts.to_account_metas(None),
+        data: alloy_curve::instruction::InitializeCurve {}.data(),
+    };
+    let msg = Message::new(&[init_ix], Some(&creator.pubkey()));
+    let tx = Transaction::new(&[&creator, &mint], msg, svm.latest_blockhash());
+    svm.send_transaction(tx).expect("initialize_curve failed");
+
+    // 0.1 SOL buy: 1% fee = 1_000_000 lamports, split 40/40/20 -> staker/treasury cuts of
+    // 400_000/200_000 lamports, both well under a fresh account's rent-exempt minimum.
+    let buyer_ata = get_associated_token_address(&buyer.pubkey(), &mint.pubkey());
+    let buy_accounts = alloy_curve::accounts::Trade {
+        buyer: buyer.pubkey(),
+        curve,
+        mint: mint.pubkey(),
+        curve_token_vault,
+        trader_token_account: buyer_ata,
+        sol_vault,
+        creator: creator.pubkey(),
+        staker_pool,
+        treasury,
+        emergency_config,
+        token_program: anchor_spl::token::ID,
+        associated_token_program: anchor_spl::associated_token::ID,
+        system_program: system_program::ID,
+    };
+    let buy_ix = Instruction {
+        program_id: alloy_curve::ID,
+        accounts: buy_accounts.to_account_metas(None),
+        data: alloy_curve::instruction::Buy { sol_in: 100_000_000, min_tokens_out: 1 }.data(),
+    };
+    let msg = Message::new(&[buy_ix], Some(&buyer.pubkey()));
+    let tx = Transaction::new(&[&buyer], msg, svm.latest_blockhash());
+    svm.send_transaction(tx).expect("small buy should succeed once vaults are pre-funded past rent-exemption");
+}
+
 #[test]
 fn full_lifecycle_buy_then_sell() {
     let mut svm = LiteSVM::new();

@@ -199,6 +199,24 @@ program's context (e.g. `ansi_term` is a terminal-color crate that ships in as p
 toolchain's CLI tooling, not the on-chain program logic). Recommend re-running before mainnet in
 case the toolchain has since updated past these.
 
+**Decision — 2026-09-04: defer the WalletConnect (`@reown/appkit`) / `@solana/spl-token`
+upgrade.** Recorded decision, not an open question anymore.
+
+Reasoning: of the 14 high-severity findings, 13 are unreachable in this app's actual usage —
+they live in code paths (`elliptic`, `ws`, `viem`, `decode-uri-component` transitive chains) that
+this app never exercises given how `@reown/appkit` is invoked here. The remaining one,
+`bigint-buffer` (pulled in via `@solana/spl-token`), is a narrow, RPC-dependent issue rather than
+a directly attacker-triggerable one from client input. `npm audit fix --force` would downgrade
+`@solana/wallet-adapter-walletconnect` to 0.1.17 and `@solana/spl-token` to 0.1.8 — both breaking
+changes requiring manual regression testing — and given the reachability analysis above, that
+cost isn't justified right now.
+
+**Reminder: re-run this reachability analysis before any mainnet deploy.** "Not reachable today"
+is a statement about the current code paths and current dependency versions, not a permanent
+property — a future change to how `@reown/appkit` or `@solana/spl-token` is invoked, or an
+upgrade that changes the vulnerable code paths, could make one of the 13 reachable. Don't treat
+this deferral as settled for a mainnet deploy without re-checking it then.
+
 ## 10. Secrets hygiene — 🟢 VERIFIED
 
 `git log --all -p` scanned for API-key/private-key patterns (`sk-ant-`, `AIza`, `AKIA`, PEM
@@ -267,6 +285,172 @@ OK: fee split held exactly (40/40/20) across every one of 300 rapid trades; crea
 stayed pre-graduation the whole time since trades were sell-biased) — worth one more explicit run
 forcing a graduation crossing under load, and a true multi-token concurrent-load run, before
 mainnet.
+
+---
+
+## Re-verification pass — 2026-09-03 (same day, independent session)
+
+Everything below was re-checked from scratch against the current code — not re-read from this
+doc's claims above. Where this pass disagrees with or adds to an item above, that's noted.
+
+- **§1 Fee split** — re-confirmed with a fresh clean rebuild (`cargo clean -p alloy_curve` +
+  `anchor build` + `cargo test --release`, all 5 integration tests + 1 unit test passing,
+  including the 300-trade concurrent-load test: exact 40/40/20 split held on every trade).
+  🟢 still verified.
+- **§2 Anti-rug-pull** — independently re-read `lib/rugDetection.ts` end to end: still purely a
+  read/scoring function, zero callers outside the UI, not imported by `lib/trading.ts` or any
+  API route. Confirmed: **there is nothing to bypass, because nothing enforces it.** If any
+  user-facing copy implies flagged wallets are blocked, that claim is false as of this code.
+  🔴 still open — this is a product decision, not a bug.
+- **§3 Admin checks** — re-confirmed `lib/admin.ts` unchanged; `isAppAdmin()` still falls back to
+  on-chain treasury admin when `ADMIN_WALLET_IDS` is unset. **Action item, not a code fix:**
+  set `ADMIN_WALLET_IDS` explicitly in the production environment before launch — don't rely on
+  the fallback firing correctly by accident.
+- **§5 IDOR / listing-hijack** — **definitive re-verification, done independently, not by
+  re-reading this doc's §5 claim:** read `app/api/tokens/route.ts` POST directly — the hijack
+  fix (`onchainCurve.creator !== creatorId` check against the session wallet, atomic INSERT on
+  the mint-address primary key) is genuinely present. Separately read `lib/auth.ts` — the
+  session wallet comes from an HMAC-signed, `httpOnly` cookie bound to a real ed25519 signature
+  over a single-use nonce (`verifySignature`), not client-suppliable. Spot-checked 3 of the 18
+  dynamic-`[id]` mutation routes directly (`wallet/[id]` PATCH, `tokens/[id]` PATCH,
+  `connections/[id]/respond`) — all three check the session wallet against resource ownership
+  before writing. **Both fixes are real and correct in the current code. This is settled — not
+  "still unclear."**
+- **§6 Kill switch** — re-tested after a clean rebuild (see below) and still passes: unauthorized
+  pause rejected, buy/init-curve rejected while paused, resumes correctly after unpause. Still
+  only tested at the unit/local-validator level — devnet + real wallet-adapter UI dry run is
+  still not done (unchanged gap from original §6).
+- **§7 Treasury custody — re-confirmed explicitly, still the placeholder.** `TREASURY_ADMIN` in
+  `lib.rs` is still `9EujSJZEKXFWeaAYfRRacq6y9rjkTjLD2P3UcUtvGFqQ`, the locally-generated
+  `treasury-wallet.json` dev key. **Nothing about this has changed. This is the single
+  highest-consequence item in this whole doc and it is not done.**
+- **§9 Dependency vulnerabilities** — re-ran both scanners fresh: `npm audit` still exactly
+  44/14/22/8 (total/high/moderate/low), unchanged since the original scan — confirms no fix was
+  ever applied, and no decision has been recorded anywhere in the repo (git log, docs) about
+  what to do with the WalletConnect-transitive findings. **Still fully open.** `cargo audit`
+  still 0 vulnerabilities, same 6 unmaintained/unsound advisory warnings on toolchain
+  transitive deps, none in `alloy_curve`'s own code.
+- **§11 RPC fallback** — code re-confirmed unchanged and intact; still only tested for "primary
+  down at startup," not mid-session failover.
+- **§13 Load test** — re-ran fresh (part of the clean rebuild above); still only single-token,
+  pre-graduation. Graduation-crossing burst and multi-token concurrent load still untested.
+
+### New this pass: independent fresh-eyes read of `buy`/`sell` for drain/rug-bypass/balance-manipulation
+
+Read `onchain/programs/alloy_curve/src/lib.rs` in full, independent of the sections above, looking
+specifically for a way to drain funds, bypass rug-pull enforcement, or manipulate one's own
+balance. Findings:
+
+- **No drain vector found.** Every payout (`sell`'s SOL, `buy`'s tokens) happens only *after* the
+  corresponding CPI that proves the trader actually has what they're trading away (SPL transfer
+  of tokens on `sell`, lamport transfer of SOL on `buy`) — Solana's atomic-transaction semantics
+  mean if that CPI fails for insufficient balance, the whole instruction (including any earlier
+  reserve-state mutation) reverts. There's no code path that credits a payout without the matching
+  debit having actually succeeded.
+- **No redirection vector.** `creator`, `sol_vault`, `staker_pool`, and `treasury` are all either
+  `has_one`-constrained or PDA-seed-derived — a caller cannot substitute an attacker-controlled
+  account for any of the fee-split destinations.
+- **No re-mint / dilution vector.** Mint authority is revoked permanently inside `initialize_curve`
+  itself, before the function returns — there's no later instruction that could mint more supply.
+- **Reserve-arithmetic underflow check:** `curve.virtual_token_reserves -= out` and
+  `curve.real_token_reserves -= out` (lib.rs:130,135) are raw (non-`checked_`) subtractions.
+  Traced the invariant by hand: `real_token_reserves <= virtual_token_reserves` holds from
+  initialization (793.1M ≤ 1.073B) and is preserved every trade because the clamp at lib.rs:126-128
+  guarantees `out <= real_token_reserves` before either field is decremented by that same `out` —
+  so neither subtraction can underflow. (Also: `overflow-checks = true` is set in the release
+  profile, so this would panic loudly rather than silently wrap if the invariant were ever wrong —
+  and the fresh test run above exercised this path, including the graduation transition, with no
+  panic.)
+- **Rounding-direction check:** integer division in the constant-product math rounds in the
+  trader's favor by construction (floor division on the *reserve being reduced*), but bounded to
+  at most 1 raw unit (1 micro-token or 1 lamport) per trade — economically dust, far smaller than
+  the 1%/0.25% fee or any real transaction cost, not compounding faster than linearly with trade
+  count. Not exploitable at any practical scale.
+- **Anti-rug-pull "ban":** confirmed (again, see §2 above) there is no on-chain or API-layer
+  enforcement to bypass — `assessRugRisk()` never gates a trade anywhere in `lib/trading.ts` or
+  the on-chain program.
+- Also independently checked the **off-chain simulated ledger** (`lib/trading.ts`, used for the
+  guest/non-wallet-connected "SIMULATED LEDGER" mode): `executeBuy`/`executeSell` run inside a
+  single `db.transaction()`, check `wallet.core_balance`/`holding.amount` before allowing the
+  trade, and the calling route (`app/api/tokens/[id]/trade/route.ts`) takes `walletId` only from
+  `getSessionWalletId()` — never from the request body — so a client can't trade against someone
+  else's simulated balance either.
+
+### Toolchain re-run (fresh, this pass)
+
+- `npx tsc --noEmit` — clean, 0 errors.
+- `cargo check --release` — clean.
+- `cargo clippy --release --all-targets` — 1 warning, purely stylistic
+  (`assign_op_pattern` on lib.rs:130, the same line manually proven safe above) — not a
+  correctness or security finding.
+- `cargo test --release` — **initially failed all 5 integration tests** with
+  `run \`anchor build\` first so target/deploy/alloy_curve.so exists`, despite the .so file
+  actually being present on disk. Root cause: a stale compiled test binary left over from
+  renaming this project's directory from `ember` to `alloy` earlier in the day —
+  `env!("CARGO_MANIFEST_DIR")` gets baked into the test binary at compile time, and cargo's
+  incremental build hadn't detected the directory rename as a reason to recompile it, so the
+  binary was still looking for `/Users/artyom/projects/ember/onchain/...`. Fixed with
+  `cargo clean -p alloy_curve --release`; all 5 tests pass on the clean rebuild (output above).
+  **Not a code regression** — but if you ever move/rename this directory again, run
+  `cargo clean -p alloy_curve` in `onchain/` before trusting a green test run.
+- No JS/TS automated test suite exists anywhere in the app (`grep` for `*.test.*`/`*.spec.*`
+  across the repo: zero hits). Playwright is a `devDependency` but has no config or spec files —
+  it isn't wired to anything. Every API-route/auth/IDOR finding in this document rests on manual
+  code review, not on regression tests that would catch a future accidental reintroduction.
+
+### Not independently re-verifiable this pass
+
+No browser is available in this environment. Did not click through the wallet-connect flow or
+the create-token flow live, and did not visually confirm the maximized/windowed ticker behavior.
+Did confirm: every nav route returns HTTP 200 with no server-side errors logged
+(`/`, `/about`, `/ideas`, `/create`, `/stake`, `/connect`, `/wallet`, `/settings`), and read the
+create-token flow's code end to end (`app/(app)/create/page.tsx`) — it correctly awaits
+`connection.confirmTransaction(...)` before POSTing to `/api/tokens`, so there's no race between
+the on-chain confirm and the server-side verification. This is a code-correctness check, not a
+substitute for actually clicking through it.
+
+### Domain
+
+No evidence in this repo of an actual registered/configured production domain — `alloy.fun`
+appears exactly once, as a hardcoded fallback string in `app/providers.tsx`'s WalletConnect
+metadata (`... : "https://alloy.fun"`), used only when `window` is undefined during SSR. That's
+not proof of a real, owned, DNS-configured domain. This is outside what the codebase can confirm —
+needs a direct answer from you, not from a code review.
+
+---
+
+## 14. Vault rent-exemption bootstrap — 🟢 FIXED (2026-09-05, folded into init code path)
+
+**The bug:** `treasury` and `staker_pool` are bare system-owned PDAs (never `init`'d) that sit at
+0 lamports until something transfers into them. Solana's runtime rejects any transfer that would
+leave a fresh account non-zero but below the rent-exempt minimum for its size — and a normal
+trade's treasury/staker fee cut (a fraction of 1% of the trade) is almost always smaller than
+that minimum. Left alone, this would have rejected literally every real trade on a live deploy.
+
+**How it was originally found and fixed:** caught by scripting a real wallet through the actual
+buy/sell flow on devnet (see Tier 2 of the 2026-09-05 session). The immediate fix at the time was
+a manual `solana transfer`-equivalent top-up against the already-deployed devnet program — **not**
+a code change, meaning a future mainnet deploy would have hit the exact same failure on its first
+real trade unless someone remembered to repeat that manual step.
+
+**The permanent fix:** `initialize_treasury_config` (`onchain/programs/alloy_curve/src/lib.rs`)
+now tops up both `treasury` and `staker_pool` to `Rent::get()?.minimum_balance(0)` itself, paid by
+the calling admin, as part of the same one-time bootstrap call that sets the treasury admin.
+Since `initialize_treasury_config` must be called once before real trading can meaningfully
+happen on any deploy (devnet or mainnet), this can no longer be forgotten — it's not a separate
+step to remember, it's the same step that was already mandatory.
+
+Regression-tested in `onchain/programs/alloy_curve/tests/integration.rs`
+(`treasury_config_bootstrap_funds_vaults_past_rent_exemption`): confirms both vaults start at 0,
+confirms they're at or above the rent-exempt minimum immediately after
+`initialize_treasury_config`, and then runs a real small buy (0.1 SOL, whose staker/treasury fee
+cuts are ~400k/~200k lamports — both under the rent-exempt minimum) to prove the trade that used
+to fail now succeeds. All 6 integration tests pass (`cargo test --release`).
+
+**Still worth doing before mainnet:** the devnet program's vaults were already funded manually
+before this fix existed — that funding is now redundant but harmless. A *fresh* mainnet program
+deploy will get its vaults funded automatically the first time `initialize_treasury_config` is
+called, with no separate manual step required.
 
 ---
 

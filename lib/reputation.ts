@@ -1,13 +1,9 @@
-import Database from "better-sqlite3";
+import { type DB, dbAll } from "./db";
 import { assessRugRisk } from "./rugDetection";
+import { type ReputationTier, REPUTATION_TIER_LABEL } from "./reputationTier";
 
-export type ReputationTier = "new" | "builder" | "established" | "flagged";
-
-export const REPUTATION_TIER_LABEL: Record<Exclude<ReputationTier, "new">, string> = {
-  builder: "Repeat builder",
-  established: "Established creator",
-  flagged: "Flagged launch history",
-};
+export type { ReputationTier };
+export { REPUTATION_TIER_LABEL };
 
 export interface CreatorReputation {
   tier: ReputationTier;
@@ -24,14 +20,17 @@ export interface CreatorReputation {
  * scoring pass, so a creator currently running a flagged token can never outrank one who
  * isn't, regardless of raw launch count.
  */
-export function computeCreatorReputation(db: Database.Database, walletId: string): CreatorReputation {
-  const tokens = db
-    .prepare("SELECT id, graduated, created_at FROM tokens WHERE creator_id = ?")
-    .all(walletId) as { id: string; graduated: number; created_at: number }[];
+export async function computeCreatorReputation(db: DB, walletId: string): Promise<CreatorReputation> {
+  const tokens = await dbAll<{ id: string; graduated: number; created_at: number }>(
+    db,
+    "SELECT id, graduated, created_at FROM tokens WHERE creator_id = $1",
+    [walletId]
+  );
 
   const tokensCreated = tokens.length;
   const tokensGraduated = tokens.filter((t) => t.graduated).length;
-  const currentHighRiskCount = tokens.filter((t) => assessRugRisk(db, t.id).riskLevel === "high").length;
+  const riskLevels = await Promise.all(tokens.map((t) => assessRugRisk(db, t.id)));
+  const currentHighRiskCount = riskLevels.filter((r) => r.riskLevel === "high").length;
   const buildingSinceMs = tokens.length ? Math.min(...tokens.map((t) => t.created_at)) : null;
 
   let tier: ReputationTier = "new";
@@ -48,10 +47,10 @@ export function computeCreatorReputation(db: Database.Database, walletId: string
 
 /** De-dupes creator ids before computing — same purpose as app/api/tokens/route.ts's
  * creatorVerifiedCache, so a multi-token creator's reputation isn't recomputed per token. */
-export function reputationBatch(db: Database.Database, creatorIds: string[]): Map<string, CreatorReputation> {
+export async function reputationBatch(db: DB, creatorIds: string[]): Promise<Map<string, CreatorReputation>> {
   const result = new Map<string, CreatorReputation>();
-  for (const id of new Set(creatorIds)) {
-    result.set(id, computeCreatorReputation(db, id));
-  }
+  const uniqueIds = [...new Set(creatorIds)];
+  const reputations = await Promise.all(uniqueIds.map((id) => computeCreatorReputation(db, id)));
+  uniqueIds.forEach((id, i) => result.set(id, reputations[i]));
   return result;
 }

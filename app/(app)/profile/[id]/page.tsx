@@ -6,7 +6,7 @@ import ProfilePageClient from "@/components/ProfilePageClient";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const profile = computeWalletProfile(getDb(), id);
+  const profile = await computeWalletProfile(await getDb(), id);
   if (!profile) return { title: "Wallet not found | Alloy" };
 
   return {

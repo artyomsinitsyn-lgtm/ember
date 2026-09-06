@@ -655,7 +655,14 @@ export type AlloyCurve = {
       "docs": [
         "One-time bootstrap: only `TREASURY_ADMIN` (the platform's own wallet) can call this, and",
         "doing so makes it the treasury admin — the only wallet allowed to withdraw the",
-        "protocol's accumulated fee cut or hand admin off to someone else."
+        "protocol's accumulated fee cut or hand admin off to someone else.",
+        "",
+        "Also tops up the `treasury` and `staker_pool` vaults to the rent-exemption minimum. Both",
+        "are bare system-owned PDAs (never `init`'d) that otherwise sit at 0 lamports until the",
+        "first trade's fee cut lands in them — and that first cut is normally far smaller than the",
+        "rent-exempt minimum for a fresh account, which the runtime rejects. Doing the top-up here,",
+        "as part of the same one-time call that must happen before real trading opens, means no",
+        "deploy can ever go live without it (see `docs/security/audit-package.md` §7)."
       ],
       "discriminator": [
         42,
@@ -697,6 +704,57 @@ export type AlloyCurve = {
                   102,
                   105,
                   103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "minimum here so the first (tiny) trade fee cut into it doesn't get rejected."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "stakerPool",
+          "docs": [
+            "`treasury` above."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101,
+                  114,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
                 ]
               }
             ]

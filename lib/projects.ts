@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import { type DB, dbGet, dbRun } from "./db";
 
 export interface Milestone {
   id: string;
@@ -30,8 +30,8 @@ export interface SerializedProject {
 
 const MAX_ROADMAP_ITEMS = 12;
 
-export function getProject(db: Database.Database, tokenId: string): ProjectRow | undefined {
-  return db.prepare("SELECT * FROM projects WHERE token_id = ?").get(tokenId) as ProjectRow | undefined;
+export async function getProject(db: DB, tokenId: string): Promise<ProjectRow | undefined> {
+  return dbGet<ProjectRow>(db, "SELECT * FROM projects WHERE token_id = $1", [tokenId]);
 }
 
 export function serializeProject(row: ProjectRow): SerializedProject {
@@ -65,11 +65,11 @@ function clampMilestones(input: unknown): Milestone[] {
   }));
 }
 
-export function upsertProject(
-  db: Database.Database,
+export async function upsertProject(
+  db: DB,
   tokenId: string,
   input: { tagline?: string; details?: string; roadmap?: unknown; discord?: string; github?: string }
-): ProjectRow {
+): Promise<ProjectRow> {
   const now = Date.now();
   const clean = (v: unknown, max: number) => {
     const s = String(v ?? "").trim().slice(0, max);
@@ -81,17 +81,19 @@ export function upsertProject(
   const discord = clean(input.discord, 200);
   const github = clean(input.github, 200);
 
-  db.prepare(
+  await dbRun(
+    db,
     `INSERT INTO projects (token_id, tagline, details, roadmap_json, discord, github, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(token_id) DO UPDATE SET
-       tagline = excluded.tagline,
-       details = excluded.details,
-       roadmap_json = excluded.roadmap_json,
-       discord = excluded.discord,
-       github = excluded.github,
-       updated_at = excluded.updated_at`
-  ).run(tokenId, tagline, details, roadmapJson, discord, github, now, now);
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     ON CONFLICT (token_id) DO UPDATE SET
+       tagline = EXCLUDED.tagline,
+       details = EXCLUDED.details,
+       roadmap_json = EXCLUDED.roadmap_json,
+       discord = EXCLUDED.discord,
+       github = EXCLUDED.github,
+       updated_at = EXCLUDED.updated_at`,
+    [tokenId, tagline, details, roadmapJson, discord, github, now, now]
+  );
 
-  return getProject(db, tokenId)!;
+  return (await getProject(db, tokenId))!;
 }

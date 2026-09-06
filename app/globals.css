@@ -245,11 +245,10 @@ body {
   --ry: 0deg;
   position: relative;
   transform: perspective(900px) rotateX(var(--rx)) rotateY(var(--ry));
-  /* Short on purpose: JS sets a new target angle on every pointermove, so any longer
-     duration here means the tilt is always chasing a moving target — that reads as lag,
-     not smoothness. 90ms is short enough to feel 1:1 with the cursor but still softens
-     raw mouse jitter and gives the leave-reset a small, deliberate snap. */
-  transition: transform 0.09s ease-out;
+  /* No CSS transition here on purpose — the component now eases --rx/--ry toward the
+     pointer's target itself, once per animation frame (see PrismCard.tsx's DAMP loop).
+     A CSS transition retriggering on every one of those per-frame custom-property writes
+     would fight the JS easing and reintroduce the stutter this replaced. */
   transform-style: preserve-3d;
 }
 .prism-card-sheen {

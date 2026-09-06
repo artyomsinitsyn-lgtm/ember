@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getDb, dbGet } from "@/lib/db";
 import { getSessionWalletId } from "@/lib/auth";
 import { upsertProject, serializeProject } from "@/lib/projects";
 import { serializeToken } from "@/lib/serialize";
@@ -11,14 +11,14 @@ import type { TokenRow } from "@/lib/trading";
  * ALREADY-EXISTING token, without touching its bonding-curve/trading row. */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const db = getDb();
+  const db = await getDb();
 
-  const row = db
-    .prepare(
-      `SELECT tokens.*, wallets.name as creator_name FROM tokens
-       JOIN wallets ON wallets.id = tokens.creator_id WHERE tokens.id = ?`
-    )
-    .get(id) as (TokenRow & { creator_name: string }) | undefined;
+  const row = await dbGet<TokenRow & { creator_name: string }>(
+    db,
+    `SELECT tokens.*, wallets.name as creator_name FROM tokens
+     JOIN wallets ON wallets.id = tokens.creator_id WHERE tokens.id = $1`,
+    [id]
+  );
   if (!row) return NextResponse.json({ error: "Token not found" }, { status: 404 });
 
   const sessionWalletId = await getSessionWalletId();
@@ -27,7 +27,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const body = await req.json();
-  const projectRow = upsertProject(db, id, {
+  const projectRow = await upsertProject(db, id, {
     tagline: body.tagline,
     details: body.details,
     roadmap: body.roadmap,
@@ -35,8 +35,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     github: body.github,
   });
 
-  const updatedRow = db.prepare("SELECT * FROM tokens WHERE id = ?").get(id) as TokenRow;
-  const rugRisk = assessRugRisk(db, id);
+  const updatedRow = (await dbGet<TokenRow>(db, "SELECT * FROM tokens WHERE id = $1", [id]))!;
+  const rugRisk = await assessRugRisk(db, id);
 
   return NextResponse.json({
     project: serializeProject(projectRow),

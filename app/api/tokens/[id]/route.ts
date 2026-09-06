@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getDb, dbGet, dbAll, dbRun } from "@/lib/db";
 import { serializeToken } from "@/lib/serialize";
 import { assessRugRisk } from "@/lib/rugDetection";
 import { computeTokenHolderPositions } from "@/lib/positions";
@@ -10,34 +10,34 @@ import type { TokenRow } from "@/lib/trading";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const db = getDb();
+  const db = await getDb();
 
-  const row = db
-    .prepare(
-      `SELECT tokens.*, wallets.name as creator_name
-       FROM tokens JOIN wallets ON wallets.id = tokens.creator_id
-       WHERE tokens.id = ?`
-    )
-    .get(id) as (TokenRow & { creator_name: string }) | undefined;
+  const row = await dbGet<TokenRow & { creator_name: string }>(
+    db,
+    `SELECT tokens.*, wallets.name as creator_name
+     FROM tokens JOIN wallets ON wallets.id = tokens.creator_id
+     WHERE tokens.id = $1`,
+    [id]
+  );
 
   if (!row) return NextResponse.json({ error: "Token not found" }, { status: 404 });
 
-  const trades = db
-    .prepare(
-      `SELECT trades.*, wallets.name as wallet_name, wallets.avatar as wallet_avatar
-       FROM trades JOIN wallets ON wallets.id = trades.wallet_id
-       WHERE token_id = ? ORDER BY created_at DESC LIMIT 50`
-    )
-    .all(id);
+  const trades = await dbAll(
+    db,
+    `SELECT trades.*, wallets.name as wallet_name, wallets.avatar as wallet_avatar
+     FROM trades JOIN wallets ON wallets.id = trades.wallet_id
+     WHERE token_id = $1 ORDER BY created_at DESC LIMIT 50`,
+    [id]
+  );
 
-  const holders = computeTokenHolderPositions(db, id).slice(0, 50);
+  const holders = (await computeTokenHolderPositions(db, id)).slice(0, 50);
 
-  const rugRisk = assessRugRisk(db, id);
-  const projectRow = getProject(db, id);
-  const creatorReputation = computeCreatorReputation(db, row.creator_id);
+  const rugRisk = await assessRugRisk(db, id);
+  const projectRow = await getProject(db, id);
+  const creatorReputation = await computeCreatorReputation(db, row.creator_id);
   const backerCount = (
-    db.prepare("SELECT COUNT(*) as c FROM holdings WHERE token_id = ? AND amount > 0.0001").get(id) as { c: number }
-  ).c;
+    await dbGet<{ c: number }>(db, "SELECT COUNT(*) as c FROM holdings WHERE token_id = $1 AND amount > 0.0001", [id])
+  )!.c;
 
   return NextResponse.json({
     token: serializeToken(
@@ -71,11 +71,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
  * Token creator who just wants to fix a typo shouldn't have to opt into a roadmap/tagline. */
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const db = getDb();
+  const db = await getDb();
 
-  const row = db.prepare("SELECT creator_id FROM tokens WHERE id = ?").get(id) as
-    | { creator_id: string }
-    | undefined;
+  const row = await dbGet<{ creator_id: string }>(db, "SELECT creator_id FROM tokens WHERE id = $1", [id]);
   if (!row) return NextResponse.json({ error: "Token not found" }, { status: 404 });
 
   const sessionWalletId = await getSessionWalletId();
@@ -89,6 +87,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
   const description = body.description.trim().slice(0, 280);
 
-  db.prepare("UPDATE tokens SET description = ? WHERE id = ?").run(description, id);
+  await dbRun(db, "UPDATE tokens SET description = $1 WHERE id = $2", [description, id]);
   return NextResponse.json({ ok: true });
 }

@@ -13,7 +13,10 @@ alloy_curve = "9brEDkea42QTp3dGT7jMWLE7pgnttHo5ZmyWDDPkzrbb"
 alloy_curve = "9brEDkea42QTp3dGT7jMWLE7pgnttHo5ZmyWDDPkzrbb"
 
 [provider]
-cluster = "localnet"
+# Devnet: current plan is demo/launch on devnet first (test SOL, no real funds at risk), so
+# `anchor deploy`/`anchor run` target it by default. Override with --provider.cluster for a
+# local-validator session.
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

@@ -1,6 +1,4 @@
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
-import path from "path";
-import fs from "fs";
 import { cookies } from "next/headers";
 import { PublicKey } from "@solana/web3.js";
 import { ed25519 } from "@noble/curves/ed25519.js";
@@ -9,7 +7,15 @@ import { YOU_WALLET_ID } from "./constants";
 const SESSION_COOKIE = "alloy_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 365;
 const NONCE_TTL_MS = 5 * 60 * 1000;
-const SECRET_PATH = path.join(process.cwd(), "data", ".auth-secret");
+
+// Was previously a secret written to a local file on first use — that only worked because
+// SQLite's data/ directory happened to be writable in dev. On Vercel serverless the
+// filesystem is read-only outside /tmp, and even /tmp wouldn't help: each invocation can
+// land on a different instance with no shared disk, so a session signed by one instance
+// would fail verification on another. SESSION_SECRET must be set in any real deployment —
+// same pattern as PII_ENCRYPTION_KEY (see lib/pii.ts).
+const DEV_FALLBACK_SECRET = "alloy-dev-only-insecure-session-secret-do-not-use-in-prod";
+let cachedSecret: string | null = null;
 
 /**
  * Every mutating API route trusted a client-supplied walletId with zero verification —
@@ -24,12 +30,20 @@ const SECRET_PATH = path.join(process.cwd(), "data", ".auth-secret");
  */
 
 function getSecret(): string {
-  const dir = path.dirname(SECRET_PATH);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  if (!fs.existsSync(SECRET_PATH)) {
-    fs.writeFileSync(SECRET_PATH, randomBytes(32).toString("hex"), { mode: 0o600 });
+  if (cachedSecret) return cachedSecret;
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "SESSION_SECRET is not set. Refusing to sign session cookies with the public dev-only fallback secret in production."
+      );
+    }
+    console.warn("[auth] SESSION_SECRET not set — using an insecure dev-only fallback secret. Do not use in production.");
+    cachedSecret = DEV_FALLBACK_SECRET;
+  } else {
+    cachedSecret = secret;
   }
-  return fs.readFileSync(SECRET_PATH, "utf8").trim();
+  return cachedSecret;
 }
 
 function signToken(walletId: string): string {

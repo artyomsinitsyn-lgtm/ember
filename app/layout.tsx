@@ -5,6 +5,7 @@ import CursorFx from "@/components/CursorFx";
 import PresenceBeacon from "@/components/PresenceBeacon";
 import WalletManualLink from "@/components/WalletManualLink";
 import AlloyHeader from "@/components/AlloyHeader";
+import ClusterBanner from "@/components/ClusterBanner";
 import AlloyTicker from "@/components/AlloyTicker";
 import AlloyFooter from "@/components/AlloyFooter";
 import PageTransition from "@/components/PageTransition";
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <div className="alloy-page">
             <div className="alloy-noise-a" />
             <div className="alloy-noise-b" />
+            <ClusterBanner />
             <AlloyHeader />
             <AlloyTicker />
             <PageTransition>{children}</PageTransition>

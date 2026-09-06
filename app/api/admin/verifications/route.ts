@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getDb, dbAll } from "@/lib/db";
 import { getSessionWalletId } from "@/lib/auth";
 import { isAppAdmin } from "@/lib/admin";
 import { decryptPII } from "@/lib/pii";
@@ -23,17 +23,8 @@ export async function GET() {
     return NextResponse.json({ error: "Not the treasury admin" }, { status: 403 });
   }
 
-  const db = getDb();
-  const rows = db
-    .prepare(
-      `SELECT verification_requests.id, verification_requests.wallet_id, verification_requests.status,
-              verification_requests.created_at, verification_requests.decided_at,
-              wallets.name as wallet_name, wallets.avatar as wallet_avatar,
-              wallets.contact, wallets.contact_type, wallets.twitter_handle
-       FROM verification_requests JOIN wallets ON wallets.id = verification_requests.wallet_id
-       ORDER BY (verification_requests.status = 'pending') DESC, verification_requests.created_at DESC`
-    )
-    .all() as {
+  const db = await getDb();
+  const rows = await dbAll<{
     id: string;
     wallet_id: string;
     status: string;
@@ -44,7 +35,15 @@ export async function GET() {
     contact: string | null;
     contact_type: string | null;
     twitter_handle: string | null;
-  }[];
+  }>(
+    db,
+    `SELECT verification_requests.id, verification_requests.wallet_id, verification_requests.status,
+            verification_requests.created_at, verification_requests.decided_at,
+            wallets.name as wallet_name, wallets.avatar as wallet_avatar,
+            wallets.contact, wallets.contact_type, wallets.twitter_handle
+     FROM verification_requests JOIN wallets ON wallets.id = verification_requests.wallet_id
+     ORDER BY (verification_requests.status = 'pending') DESC, verification_requests.created_at DESC`
+  );
 
   return NextResponse.json({
     requests: rows.map((r) => ({

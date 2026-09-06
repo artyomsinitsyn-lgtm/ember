@@ -9,16 +9,23 @@ const DAMP = 0.055;
 const DRIFT_PERIOD_MS = 18000;
 const DRIFT_AMPLITUDE = 7;
 const REST_POS = { x: 50, y: 38 };
+// Slow independent cycle for the blobs' hue-rotate, decoupled from the position drift period
+// so the color shift doesn't read as locked to the movement — gives the glow a holo-foil
+// color-shift on top of its drift instead of a fixed blue/violet tint.
+const HUE_PERIOD_MS = 12000;
+const HUE_AMPLITUDE_DEG = 34;
 
 /**
  * Ambient cursor-following glow, scoped to whatever section renders it — two large, soft,
- * blurred blobs (blue-dominant, a hint of violet/cyan) whose center is driven by --mx/--my
- * on the host element. Position tracking reuses the same pointerPercent()/prefersReducedMotion()
- * primitives PrismCard uses, then layers two things on top that PrismCard's instant 1:1
- * tracking doesn't need: an eased/damped follow (so the glow trails the cursor rather than
- * snapping to it) and a slow independent idle drift (so it's still alive when the cursor
- * stops moving), both folded into one requestAnimationFrame loop that only ever touches the
- * --mx/--my custom properties — never anything that triggers layout.
+ * blurred blobs (blue-dominant, a hint of violet/cyan, hue-shifting slowly for a holo-foil
+ * feel) whose center is driven by --mx/--my on the host element. Position tracking reuses the
+ * same pointerPercent()/prefersReducedMotion() primitives PrismCard uses, then layers two
+ * things on top that PrismCard's instant 1:1 tracking doesn't need: an eased/damped follow (so
+ * the glow trails the cursor rather than snapping to it) and a slow independent idle drift (so
+ * it's still alive when the cursor stops moving), both folded into one requestAnimationFrame
+ * loop that only ever touches the --mx/--my/--glow-hue custom properties — never anything that
+ * triggers layout, and the blobs consume --mx/--my as a transform rather than a gradient
+ * position so the movement stays compositor-only (see .alloy-ambient-blob in landing.css).
  */
 export default function AmbientGlow({ className }: { className?: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -59,8 +66,11 @@ export default function AmbientGlow({ className }: { className?: string }) {
       current.x += (target.x - current.x) * DAMP;
       current.y += (target.y - current.y) * DAMP;
 
+      const hue = Math.sin((now - start) / HUE_PERIOD_MS * Math.PI * 2) * HUE_AMPLITUDE_DEG;
+
       host!.style.setProperty("--mx", `${(current.x + driftX).toFixed(2)}%`);
       host!.style.setProperty("--my", `${(current.y + driftY).toFixed(2)}%`);
+      host!.style.setProperty("--glow-hue", `${hue.toFixed(1)}deg`);
       raf = requestAnimationFrame(tick);
     }
     raf = requestAnimationFrame(tick);

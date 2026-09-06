@@ -1,11 +1,12 @@
-import Database from "better-sqlite3";
+import { type DB, dbAll } from "./db";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export function computeBackerCounts(db: Database.Database): Map<string, number> {
-  const rows = db
-    .prepare("SELECT token_id, COUNT(*) as c FROM holdings WHERE amount > 0.0001 GROUP BY token_id")
-    .all() as { token_id: string; c: number }[];
+export async function computeBackerCounts(db: DB): Promise<Map<string, number>> {
+  const rows = await dbAll<{ token_id: string; c: number }>(
+    db,
+    "SELECT token_id, COUNT(*) as c FROM holdings WHERE amount > 0.0001 GROUP BY token_id"
+  );
   return new Map(rows.map((r) => [r.token_id, r.c]));
 }
 
@@ -21,14 +22,14 @@ export interface GrowthDelta {
  * delta over the same windows — one batched query bucketed in JS, same simple/explainable
  * style as lib/challengeScore.ts. No time-series table, no per-token queries.
  */
-export function computeGrowthDeltas(db: Database.Database): Map<string, GrowthDelta> {
+export async function computeGrowthDeltas(db: DB): Promise<Map<string, GrowthDelta>> {
   const since = Date.now() - 2 * DAY_MS;
-  const rows = db
-    .prepare(
-      `SELECT token_id, wallet_id, core_amount, created_at FROM trades
-       WHERE side = 'buy' AND created_at > ?`
-    )
-    .all(since) as { token_id: string; wallet_id: string; core_amount: number; created_at: number }[];
+  const rows = await dbAll<{ token_id: string; wallet_id: string; core_amount: number; created_at: number }>(
+    db,
+    `SELECT token_id, wallet_id, core_amount, created_at FROM trades
+     WHERE side = 'buy' AND created_at > $1`,
+    [since]
+  );
 
   const now = Date.now();
   const boundary = now - DAY_MS;

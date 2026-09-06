@@ -266,10 +266,24 @@ pub mod alloy_curve {
     /// One-time bootstrap: only `TREASURY_ADMIN` (the platform's own wallet) can call this, and
     /// doing so makes it the treasury admin — the only wallet allowed to withdraw the
     /// protocol's accumulated fee cut or hand admin off to someone else.
+    ///
+    /// Also tops up the `treasury` and `staker_pool` vaults to the rent-exemption minimum. Both
+    /// are bare system-owned PDAs (never `init`'d) that otherwise sit at 0 lamports until the
+    /// first trade's fee cut lands in them — and that first cut is normally far smaller than the
+    /// rent-exempt minimum for a fresh account, which the runtime rejects. Doing the top-up here,
+    /// as part of the same one-time call that must happen before real trading opens, means no
+    /// deploy can ever go live without it (see `docs/security/audit-package.md` §7).
     pub fn initialize_treasury_config(ctx: Context<InitializeTreasuryConfig>) -> Result<()> {
         let config = &mut ctx.accounts.treasury_config;
         config.admin = ctx.accounts.admin.key();
         config.bump = ctx.bumps.treasury_config;
+
+        let min_balance = Rent::get()?.minimum_balance(0);
+        for vault in [&ctx.accounts.treasury, &ctx.accounts.staker_pool] {
+            let shortfall = min_balance.saturating_sub(vault.lamports());
+            transfer_lamports(&ctx.accounts.admin.to_account_info(), &vault.to_account_info(), shortfall)?;
+        }
+
         emit!(TreasuryAdminChanged { new_admin: config.admin });
         Ok(())
     }
@@ -572,6 +586,16 @@ pub struct InitializeTreasuryConfig<'info> {
         bump,
     )]
     pub treasury_config: Account<'info, TreasuryConfig>,
+
+    /// CHECK: protocol treasury lamport vault, seeds enforced — topped up to the rent-exempt
+    /// minimum here so the first (tiny) trade fee cut into it doesn't get rejected.
+    #[account(mut, seeds = [TREASURY_SEED], bump)]
+    pub treasury: UncheckedAccount<'info>,
+
+    /// CHECK: staker fee-pool lamport vault, seeds enforced — same rent-exemption top-up as
+    /// `treasury` above.
+    #[account(mut, seeds = [STAKER_POOL_SEED], bump)]
+    pub staker_pool: UncheckedAccount<'info>,
 
     pub system_program: Program<'info, System>,
 }

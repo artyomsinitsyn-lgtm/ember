@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import { type DB, dbGet, dbAll } from "./db";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const UNVERIFIED_WEEKLY_CAP = 5;
@@ -14,16 +14,18 @@ const HIGH_DECLINE_RATE = 0.5;
  * always fake "verified" here since verification itself needs contact + profit, so this
  * is the second line of defense behind the recipient's own verified-only toggle.
  */
-export function checkOutboundRateLimit(
-  db: Database.Database,
+export async function checkOutboundRateLimit(
+  db: DB,
   requesterId: string,
   requesterVerified: boolean
-): { ok: true } | { ok: false; error: string } {
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const baseCap = requesterVerified ? VERIFIED_WEEKLY_CAP : UNVERIFIED_WEEKLY_CAP;
 
-  const resolved = db
-    .prepare(`SELECT status FROM connections WHERE requester_id = ? AND status IN ('accepted','declined')`)
-    .all(requesterId) as { status: string }[];
+  const resolved = await dbAll<{ status: string }>(
+    db,
+    `SELECT status FROM connections WHERE requester_id = $1 AND status IN ('accepted','declined')`,
+    [requesterId]
+  );
 
   let cap = baseCap;
   if (resolved.length >= REPUTATION_SAMPLE_MIN) {
@@ -31,9 +33,11 @@ export function checkOutboundRateLimit(
     if (declineRate > HIGH_DECLINE_RATE) cap = Math.max(2, Math.floor(baseCap / 2));
   }
 
-  const sentRecently = db
-    .prepare(`SELECT COUNT(*) as c FROM connections WHERE requester_id = ? AND created_at > ?`)
-    .get(requesterId, Date.now() - WEEK_MS) as { c: number };
+  const sentRecently = (await dbGet<{ c: number }>(
+    db,
+    `SELECT COUNT(*) as c FROM connections WHERE requester_id = $1 AND created_at > $2`,
+    [requesterId, Date.now() - WEEK_MS]
+  ))!;
 
   if (sentRecently.c >= cap) {
     return {

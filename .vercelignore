@@ -1,0 +1,12 @@
+# The Anchor/Solana on-chain program is a separate source tree, not part of the Next.js
+# app — the app only needs the vendored IDL at lib/onchain/alloy_curve.json. Excluding this
+# whole directory also avoids onchain/test-ledger/admin.rpc, a Unix socket left over from a
+# local solana-test-validator run that crashes Vercel's file uploader if it tries to read it.
+# Leading slash matters: unanchored "onchain/" also matches lib/onchain/, which the app needs.
+/onchain/
+
+# Local SQLite leftovers from before the Postgres migration — unused, not needed at runtime.
+/data/
+
+# Local QA screenshots, not part of the deployed app.
+/.light_qa_shots/

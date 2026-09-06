@@ -1,21 +1,20 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getDb, dbGet, dbAll } from "@/lib/db";
 
 export async function GET() {
-  const db = getDb();
+  const db = await getDb();
 
-  const tokensForged = (db.prepare("SELECT COUNT(*) as c FROM tokens").get() as { c: number }).c;
+  const tokensForged = (await dbGet<{ c: number }>(db, "SELECT COUNT(*) as c FROM tokens"))!.c;
 
-  const volumeAgg = db.prepare("SELECT COALESCE(SUM(core_amount), 0) as v FROM trades").get() as {
-    v: number;
-  };
+  const volumeAgg = (await dbGet<{ v: number }>(db, "SELECT COALESCE(SUM(core_amount), 0) as v FROM trades"))!;
 
   // Median, not mean — a couple of instantly-forced graduations in a small seed shouldn't
   // drag the headline number around the way an average would.
   const bondDurations = (
-    db
-      .prepare("SELECT graduated_at - created_at as d FROM tokens WHERE graduated = 1 AND graduated_at IS NOT NULL")
-      .all() as { d: number }[]
+    await dbAll<{ d: number }>(
+      db,
+      "SELECT graduated_at - created_at as d FROM tokens WHERE graduated = 1 AND graduated_at IS NOT NULL"
+    )
   )
     .map((r) => r.d)
     .sort((a, b) => a - b);

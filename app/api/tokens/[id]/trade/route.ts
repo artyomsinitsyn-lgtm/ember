@@ -15,11 +15,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
   }
 
-  const rateLimit = checkTradeRateLimit(getDb(), walletId);
+  const rateLimit = await checkTradeRateLimit(await getDb(), walletId);
   if (!rateLimit.ok) return NextResponse.json({ error: rateLimit.error }, { status: 429 });
 
   try {
-    const result = side === "buy" ? executeBuy(id, walletId, amount) : executeSell(id, walletId, amount);
+    const result = side === "buy" ? await executeBuy(id, walletId, amount) : await executeSell(id, walletId, amount);
     return NextResponse.json({ result });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Trade failed";

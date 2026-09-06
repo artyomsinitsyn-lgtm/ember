@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getDb, dbGet, dbAll, dbRun } from "@/lib/db";
 import { currentPrice } from "@/lib/bondingCurve";
 import { pendingRewards } from "@/lib/rewards";
 import { getSessionWalletId } from "@/lib/auth";
@@ -15,27 +15,25 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "You can only view your own wallet" }, { status: 403 });
   }
 
-  const db = getDb();
+  const db = await getDb();
 
-  const wallet = db.prepare("SELECT * FROM wallets WHERE id = ?").get(id) as
-    | {
-        id: string;
-        name: string;
-        avatar: string;
-        core_balance: number;
-        embr_balance: number;
-        external_contact: string | null;
-      }
-    | undefined;
+  const wallet = await dbGet<{
+    id: string;
+    name: string;
+    avatar: string;
+    core_balance: number;
+    embr_balance: number;
+    external_contact: string | null;
+  }>(db, "SELECT * FROM wallets WHERE id = $1", [id]);
   if (!wallet) return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
 
-  const holdingRows = db
-    .prepare(
-      `SELECT holdings.token_id, holdings.amount, tokens.*
-       FROM holdings JOIN tokens ON tokens.id = holdings.token_id
-       WHERE holdings.wallet_id = ? AND holdings.amount > 0.0001`
-    )
-    .all(id) as (TokenRow & { token_id: string; amount: number })[];
+  const holdingRows = await dbAll<TokenRow & { token_id: string; amount: number }>(
+    db,
+    `SELECT holdings.token_id, holdings.amount, tokens.*
+     FROM holdings JOIN tokens ON tokens.id = holdings.token_id
+     WHERE holdings.wallet_id = $1 AND holdings.amount > 0.0001`,
+    [id]
+  );
 
   const holdings = holdingRows.map((h) => {
     const price = h.graduated ? currentPrice(h.pool_core!, h.pool_token!) : currentPrice(h.v_core, h.v_token);
@@ -51,9 +49,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     };
   });
 
-  const stakePos = db
-    .prepare("SELECT staked, claimed_core FROM stake_positions WHERE wallet_id = ?")
-    .get(id) as { staked: number; claimed_core: number } | undefined;
+  const stakePos = await dbGet<{ staked: number; claimed_core: number }>(
+    db,
+    "SELECT staked, claimed_core FROM stake_positions WHERE wallet_id = $1",
+    [id]
+  );
 
   return NextResponse.json({
     wallet: {
@@ -69,16 +69,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     staking: {
       staked: stakePos?.staked ?? 0,
       claimedCore: stakePos?.claimed_core ?? 0,
-      pendingCore: pendingRewards(db, id),
+      pendingCore: await pendingRewards(db, id),
     },
   });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const db = getDb();
+  const db = await getDb();
 
-  const existing = db.prepare("SELECT id FROM wallets WHERE id = ?").get(id);
+  const existing = await dbGet(db, "SELECT id FROM wallets WHERE id = $1", [id]);
   if (!existing) return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
 
   const sessionWalletId = await getSessionWalletId();
@@ -89,49 +89,51 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json();
   const updates: string[] = [];
   const values: unknown[] = [];
+  // Called after pushing each value, so values.length is already that value's 1-indexed position.
+  const next = () => `$${values.length}`;
 
   if (typeof body.name === "string" && body.name.trim()) {
-    updates.push("name = ?");
     values.push(body.name.trim().slice(0, 30));
+    updates.push(`name = ${next()}`);
   }
   if (typeof body.avatar === "string" && body.avatar.trim()) {
-    updates.push("avatar = ?");
     values.push(body.avatar.trim().slice(0, 200));
+    updates.push(`avatar = ${next()}`);
   }
   if (typeof body.banner === "string") {
     const banner = body.banner.trim().slice(0, 200) || null;
-    updates.push("banner = ?");
     values.push(banner);
+    updates.push(`banner = ${next()}`);
     if (banner) {
-      updates.push("banner_preset = ?");
       values.push(null);
+      updates.push(`banner_preset = ${next()}`);
     }
   }
   if (typeof body.bannerPreset === "string") {
     const preset = body.bannerPreset.trim().slice(0, 40) || null;
-    updates.push("banner_preset = ?");
     values.push(preset);
+    updates.push(`banner_preset = ${next()}`);
     if (preset) {
-      updates.push("banner = ?");
       values.push(null);
+      updates.push(`banner = ${next()}`);
     }
   }
   if (typeof body.bio === "string") {
-    updates.push("bio = ?");
     values.push(body.bio.trim().slice(0, 280) || null);
+    updates.push(`bio = ${next()}`);
   }
   if (typeof body.verifiedOnlyMessages === "boolean") {
-    updates.push("verified_only_messages = ?");
     values.push(body.verifiedOnlyMessages ? 1 : 0);
+    updates.push(`verified_only_messages = ${next()}`);
   }
   if (typeof body.externalContact === "string") {
-    updates.push("external_contact = ?");
     values.push(body.externalContact.trim().slice(0, 200));
+    updates.push(`external_contact = ${next()}`);
   }
   if (typeof body.twitterHandle === "string") {
     const handle = body.twitterHandle.trim().replace(/^@/, "").slice(0, 15);
-    updates.push("twitter_handle = ?");
     values.push(handle || null);
+    updates.push(`twitter_handle = ${next()}`);
   }
 
   if (updates.length === 0) {
@@ -139,7 +141,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   values.push(id);
-  db.prepare(`UPDATE wallets SET ${updates.join(", ")} WHERE id = ?`).run(...values);
+  await dbRun(db, `UPDATE wallets SET ${updates.join(", ")} WHERE id = ${next()}`, values);
 
   return NextResponse.json({ ok: true });
 }

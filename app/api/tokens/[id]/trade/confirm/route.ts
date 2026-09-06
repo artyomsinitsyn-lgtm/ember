@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
-import { getDb } from "@/lib/db";
+import { getDb, dbGet, dbRun } from "@/lib/db";
 import { getSessionWalletId } from "@/lib/auth";
 import { getConnection, curvePda, PROGRAM_ID, TOKEN_UNIT, LAMPORTS_PER_SOL } from "@/lib/onchain/program";
 import { fetchCurveState } from "@/lib/onchain/curve";
@@ -13,7 +13,7 @@ import type { TokenRow } from "@/lib/trading";
  * The buy/sell instructions already moved real SOL and real tokens on-chain by the time this
  * runs — this endpoint's job is purely to independently verify that really happened (never
  * trust a client-submitted amount for a real-money action) and mirror the authoritative
- * result into SQLite so the existing chart/feed/leaderboard reads keep working unchanged.
+ * result into the database so the existing chart/feed/leaderboard reads keep working unchanged.
  */
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -56,13 +56,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Signature doesn't match a trade on this token by this wallet" }, { status: 400 });
   }
 
-  const db = getDb();
-  const token = db.prepare("SELECT * FROM tokens WHERE id = ?").get(id) as TokenRow | undefined;
+  const db = await getDb();
+  const token = await dbGet<TokenRow>(db, "SELECT * FROM tokens WHERE id = $1", [id]);
   if (!token) return NextResponse.json({ error: "Token not found" }, { status: 404 });
 
   // Already recorded — trade endpoints can get called twice (e.g. a retried request), and
   // this keeps that idempotent instead of double-counting the trade.
-  if (db.prepare("SELECT 1 FROM trades WHERE id = ?").get(signature)) {
+  if (await dbGet(db, "SELECT 1 FROM trades WHERE id = $1", [signature])) {
     return NextResponse.json({ ok: true, alreadyRecorded: true });
   }
 
@@ -98,17 +98,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const now = Date.now();
   const wasGraduated = !!token.graduated;
-  db.prepare(
-    `UPDATE tokens SET v_core = ?, v_token = ?, real_core = ?, real_token = ?, graduated = ?, graduated_at = COALESCE(graduated_at, ?)
-     WHERE id = ?`
-  ).run(
-    onchainCurve.virtualCore,
-    onchainCurve.virtualToken,
-    onchainCurve.realCore,
-    onchainCurve.realToken,
-    onchainCurve.graduated ? 1 : 0,
-    onchainCurve.graduated && !wasGraduated ? now : null,
-    id
+  await dbRun(
+    db,
+    `UPDATE tokens SET v_core = $1, v_token = $2, real_core = $3, real_token = $4, graduated = $5, graduated_at = COALESCE(graduated_at, $6)
+     WHERE id = $7`,
+    [
+      onchainCurve.virtualCore,
+      onchainCurve.virtualToken,
+      onchainCurve.realCore,
+      onchainCurve.realToken,
+      onchainCurve.graduated ? 1 : 0,
+      onchainCurve.graduated && !wasGraduated ? now : null,
+      id,
+    ]
   );
 
   // holdings/wallet rows still back the leaderboard, portfolio, and rug-detection reads —
@@ -121,29 +123,33 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     ? Number(holderTokenAccountBalance.value.amount) / TOKEN_UNIT
     : Number(postTokenRaw) / TOKEN_UNIT;
 
-  db.prepare(
-    `INSERT INTO holdings (wallet_id, token_id, amount) VALUES (?, ?, ?)
-     ON CONFLICT(wallet_id, token_id) DO UPDATE SET amount = excluded.amount`
-  ).run(walletId, id, newHoldingAmount);
+  await dbRun(
+    db,
+    `INSERT INTO holdings (wallet_id, token_id, amount) VALUES ($1, $2, $3)
+     ON CONFLICT (wallet_id, token_id) DO UPDATE SET amount = EXCLUDED.amount`,
+    [walletId, id, newHoldingAmount]
+  );
 
   const feeTotal = solAmount * 0.01;
   const feeCreator = feeTotal * 0.4;
   const feeStaker = feeTotal * 0.4;
   const feeTreasury = feeTotal * 0.2;
 
-  db.prepare(
+  await dbRun(
+    db,
     `INSERT INTO trades (id, token_id, wallet_id, side, core_amount, token_amount, price, fee_total, fee_creator, fee_staker, fee_treasury, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(signature, id, walletId, side, solAmount, tokenAmount, price, feeTotal, feeCreator, feeStaker, feeTreasury, now);
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+    [signature, id, walletId, side, solAmount, tokenAmount, price, feeTotal, feeCreator, feeStaker, feeTreasury, now]
+  );
 
   // Off-chain wallet/treasury/reward-pool bookkeeping still tracked for the leaderboard and
   // /stake page — the real lamports already moved on-chain; this just mirrors those same
   // amounts into the DB ledger those pages read from.
   if (feeCreator > 0) {
-    db.prepare("UPDATE wallets SET core_balance = core_balance + ? WHERE id = ?").run(feeCreator, token.creator_id);
+    await dbRun(db, "UPDATE wallets SET core_balance = core_balance + $1 WHERE id = $2", [feeCreator, token.creator_id]);
   }
-  distributeToStakers(db, feeStaker);
-  db.prepare("UPDATE treasury SET core_balance = core_balance + ? WHERE id = 1").run(feeTreasury);
+  await distributeToStakers(db, feeStaker);
+  await dbRun(db, "UPDATE treasury SET core_balance = core_balance + $1 WHERE id = 1", [feeTreasury]);
 
   emitTrade({
     tokenId: id,

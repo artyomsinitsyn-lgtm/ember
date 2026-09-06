@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getDb, dbGet, dbRun, withTransaction } from "@/lib/db";
 import { getSessionWalletId } from "@/lib/auth";
 
 // Simulated deposit only — this credits the local demo ledger and never talks to a real
@@ -18,16 +18,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
   }
 
-  const db = getDb();
-  const wallet = db.prepare("SELECT id FROM wallets WHERE id = ?").get(walletId);
+  const db = await getDb();
+  const wallet = await dbGet(db, "SELECT id FROM wallets WHERE id = $1", [walletId]);
   if (!wallet) return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
 
-  db.transaction(() => {
-    db.prepare("UPDATE wallets SET core_balance = core_balance + ? WHERE id = ?").run(amount, walletId);
-    db.prepare(
-      "INSERT INTO deposits (id, wallet_id, amount, method, created_at) VALUES (?, ?, ?, ?, ?)"
-    ).run(crypto.randomUUID(), walletId, amount, method, Date.now());
-  })();
+  await withTransaction(async (client) => {
+    await dbRun(client, "UPDATE wallets SET core_balance = core_balance + $1 WHERE id = $2", [amount, walletId]);
+    await dbRun(
+      client,
+      "INSERT INTO deposits (id, wallet_id, amount, method, created_at) VALUES ($1, $2, $3, $4, $5)",
+      [crypto.randomUUID(), walletId, amount, method, Date.now()]
+    );
+  });
 
   return NextResponse.json({ ok: true });
 }

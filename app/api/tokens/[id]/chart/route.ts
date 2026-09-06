@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getDb, dbGet, dbAll } from "@/lib/db";
 import { currentPrice } from "@/lib/bondingCurve";
 import { INITIAL_VIRTUAL_CORE_RESERVES, INITIAL_VIRTUAL_TOKEN_RESERVES } from "@/lib/constants";
 import type { TokenRow } from "@/lib/trading";
@@ -17,16 +17,18 @@ const INTERVALS: Record<string, number> = {
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const db = getDb();
-  const token = db.prepare("SELECT * FROM tokens WHERE id = ?").get(id) as TokenRow | undefined;
+  const db = await getDb();
+  const token = await dbGet<TokenRow>(db, "SELECT * FROM tokens WHERE id = $1", [id]);
   if (!token) return NextResponse.json({ error: "Token not found" }, { status: 404 });
 
   const intervalParam = req.nextUrl.searchParams.get("interval") ?? "15s";
   const bucketMs = INTERVALS[intervalParam] ?? INTERVALS["15s"];
 
-  const trades = db
-    .prepare("SELECT price, core_amount, created_at FROM trades WHERE token_id = ? ORDER BY created_at ASC")
-    .all(id) as { price: number; core_amount: number; created_at: number }[];
+  const trades = await dbAll<{ price: number; core_amount: number; created_at: number }>(
+    db,
+    "SELECT price, core_amount, created_at FROM trades WHERE token_id = $1 ORDER BY created_at ASC",
+    [id]
+  );
 
   const genesisPrice = currentPrice(INITIAL_VIRTUAL_CORE_RESERVES, INITIAL_VIRTUAL_TOKEN_RESERVES);
 

@@ -44,6 +44,15 @@
   background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.02) 0 1px, rgba(0, 0, 0, 0) 1px 4px);
 }
 
+/* ---------- Cluster banner (devnet/testnet/local-only notice) ---------- */
+.alloy-cluster-banner {
+  position: relative; z-index: 25; display: flex; align-items: center; justify-content: center;
+  gap: 8px; padding: 9px 20px; text-align: center;
+  font-family: var(--alloy-mono), monospace; font-size: 11.5px; letter-spacing: 0.04em; line-height: 1.5;
+  color: #ffd9a0; background: linear-gradient(180deg, rgba(255, 176, 32, 0.16), rgba(255, 176, 32, 0.05));
+  border-bottom: 1px solid rgba(255, 176, 32, 0.3);
+}
+
 /* ---------- Header / nav ---------- */
 .alloy-header {
   /* No backdrop-filter here on purpose: this header is sticky above a marquee ticker that
@@ -178,11 +187,28 @@
   position: relative; z-index: 20; overflow: hidden; border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.25));
 }
+/* Windowed/floating (the default): a static, unanimated row — same tokens, once each, plain
+   flow position, no transform ever applied to it. Scrolls horizontally if the row doesn't fit
+   rather than clipping tokens off, since there's no marquee here to eventually bring them back
+   into view. This and .alloy-ticker-track are both always in the DOM; which one is visible is
+   decided by AlloyTicker.tsx's `maximized` check (window.outerWidth/outerHeight vs.
+   screen.availWidth/availHeight, rechecked on every resize — see isWindowMaximized() there) via
+   the alloy-ticker-wrap-maximized class below, not a viewport-width breakpoint: a maximized
+   window on a small monitor and a large-but-not-maximized window are different cases here even
+   at the same pixel width. */
+.alloy-ticker-static {
+  display: flex; gap: 34px; overflow-x: auto; scrollbar-width: none;
+  font-family: var(--alloy-mono), monospace; font-size: 11.5px; line-height: 1.6; letter-spacing: 0.1em;
+  padding: 11px 20px; color: rgba(214, 225, 235, 0.5); white-space: nowrap;
+}
+.alloy-ticker-static::-webkit-scrollbar { display: none; }
 .alloy-ticker-track {
-  display: flex; width: max-content; animation: al-marq 46s linear infinite;
+  display: none; width: max-content; animation: al-marq 46s linear infinite;
   font-family: var(--alloy-mono), monospace; font-size: 11.5px; line-height: 1.6; letter-spacing: 0.1em;
   padding: 11px 0; color: rgba(214, 225, 235, 0.5); white-space: nowrap;
 }
+.alloy-ticker-wrap-maximized .alloy-ticker-static { display: none; }
+.alloy-ticker-wrap-maximized .alloy-ticker-track { display: flex; }
 .alloy-ticker-group { display: flex; gap: 34px; padding-right: 34px; flex: none; }
 .alloy-ticker-item { display: flex; gap: 8px; flex: none; }
 .alloy-ticker-item-link { cursor: none; transition: color 0.15s; border-radius: 4px; }
@@ -249,17 +275,59 @@
   display: flex; align-items: center; justify-content: center;
 }
 
+/* Group 3D tilt for the whole mark scene — HeroArt.tsx eases --stage-rx/--stage-ry toward the
+   pointer's angle once per frame (same damped-RAF approach as AmbientGlow's cursor-follow, just
+   driving a rotation instead of a position) and writes them here. perspective + preserve-3d on
+   the stage is what makes the halo/mark's differing translateZ below actually read as depth —
+   without it they'd just rotate flat in place with no parallax. */
+.alloy-ambient-stage-3d {
+  --stage-rx: 0deg;
+  --stage-ry: 0deg;
+  perspective: 1000px;
+  transform-style: preserve-3d;
+}
+.alloy-ambient-stage-3d .alloy-mark-halo {
+  transform: rotateX(var(--stage-rx)) rotateY(var(--stage-ry)) translateZ(-36px);
+}
+/* Combines the shared stage-level tilt with the mark's own PrismCard micro-tilt (--rx/--ry,
+   already smoothed independently in PrismCard.tsx) into one transform, rather than letting two
+   separate rotations on nested elements fight each other — and pushes the mark forward in Z
+   opposite the halo's -36px so the two visibly separate as depth, not just angle. */
+.alloy-ambient-stage-3d .alloy-logo-card {
+  transform: perspective(900px) rotateX(calc(var(--stage-rx) + var(--rx))) rotateY(calc(var(--stage-ry) + var(--ry)))
+    translateZ(28px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .alloy-ambient-stage-3d .alloy-mark-halo,
+  .alloy-ambient-stage-3d .alloy-logo-card {
+    transform: none;
+  }
+}
+
 .alloy-ambient-glow {
   --mx: 50%; --my: 38%;
   position: absolute; inset: -25%; z-index: 0; pointer-events: none;
 }
-.alloy-ambient-blob { position: absolute; inset: 0; filter: blur(48px); mix-blend-mode: screen; pointer-events: none; }
+/* Positioned by transform, not by re-solving the gradient's "at var(--mx) var(--my))" position
+   every frame: the gradient itself stays fixed at the blob's own center, and the blob (sized to
+   match its host via inset: 0, so a % translate lines up with the host's own % coordinates) is
+   what moves. A changing gradient position repaints the blurred gradient itself on every frame;
+   a changing transform is compositor-only, so the drift stays smooth instead of stepping. The
+   hue-rotate cycles independently (--glow-hue, driven by AmbientGlow.tsx) so the glow shifts
+   iridescent colors over time — the same holo-foil idea as .alloy-mark-halo-spin's hue-rotate,
+   applied to the ambient glow behind it instead of just the disc. */
+.alloy-ambient-blob {
+  position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen;
+  transform: translate(calc(var(--mx) - 50%), calc(var(--my) - 50%));
+  filter: blur(48px) hue-rotate(var(--glow-hue, 0deg));
+  will-change: transform, filter;
+}
 .alloy-ambient-blob-a {
-  background: radial-gradient(340px 340px at var(--mx) var(--my), rgba(94, 146, 255, 0.55) 0%, rgba(122, 92, 255, 0.22) 46%, transparent 74%);
+  background: radial-gradient(340px 340px at 50% 50%, rgba(94, 146, 255, 0.55) 0%, rgba(122, 92, 255, 0.22) 46%, transparent 74%);
   opacity: 0.22;
 }
 .alloy-ambient-blob-b {
-  background: radial-gradient(230px 230px at var(--mx) var(--my), rgba(120, 214, 255, 0.4) 0%, transparent 72%);
+  background: radial-gradient(230px 230px at 50% 50%, rgba(120, 214, 255, 0.4) 0%, transparent 72%);
   opacity: 0.16;
 }
 
@@ -292,6 +360,11 @@
   opacity: 0.5;
   background: conic-gradient(from 0deg, rgba(110, 165, 255, 0.55), rgba(150, 120, 255, 0.36) 25%, rgba(120, 220, 255, 0.48) 50%, rgba(150, 120, 255, 0.36) 75%, rgba(110, 165, 255, 0.55) 100%);
   animation: al-spin 16s linear infinite;
+  /* Genuine holo-foil behavior: the iridescent colors themselves shift with mouse position
+     (via --stage-ry, the same smoothed tilt angle driving the 3D rotation above), on top of
+     the constant slow spin — a static rainbow gradient that only ever spins reads as a loading
+     shimmer, not a material that's actually reacting to you. */
+  filter: hue-rotate(calc(var(--stage-ry, 0deg) * 4));
 }
 .alloy-mark-halo-pattern {
   position: absolute;
@@ -774,6 +847,12 @@
   color: #12181d;
 }
 
+/* ---------- Cluster banner (devnet/testnet/local-only notice) ---------- */
+[data-theme="light"] .alloy-cluster-banner {
+  color: #7a4b00; background: linear-gradient(180deg, rgba(255, 176, 32, 0.16), rgba(255, 176, 32, 0.06));
+  border-color: rgba(255, 176, 32, 0.4);
+}
+
 /* ---------- Header / nav ---------- */
 [data-theme="light"] .alloy-header { background: #f7f8fa; border-color: rgba(10, 16, 22, 0.09); }
 [data-theme="light"] .alloy-wordmark,
@@ -822,7 +901,7 @@
 
 /* ---------- Ticker marquee ---------- */
 [data-theme="light"] .alloy-ticker-wrap { border-color: rgba(10, 16, 22, 0.08); background: linear-gradient(180deg, rgba(10, 16, 22, 0.03), rgba(10, 16, 22, 0.01)); }
-[data-theme="light"] .alloy-ticker-track { color: rgba(18, 24, 29, 0.55); }
+[data-theme="light"] .alloy-ticker-static, [data-theme="light"] .alloy-ticker-track { color: rgba(18, 24, 29, 0.55); }
 [data-theme="light"] .alloy-ticker-item-link:hover { color: #12181d; }
 
 /* ---------- Home hero ---------- */

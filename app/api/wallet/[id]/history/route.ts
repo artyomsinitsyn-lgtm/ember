@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getDb, dbAll } from "@/lib/db";
 import { getSessionWalletId } from "@/lib/auth";
 
 interface HistoryEntry {
@@ -24,15 +24,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "You can only view your own history" }, { status: 403 });
   }
 
-  const db = getDb();
+  const db = await getDb();
 
-  const trades = db
-    .prepare(
-      `SELECT trades.*, tokens.ticker FROM trades
-       JOIN tokens ON tokens.id = trades.token_id
-       WHERE trades.wallet_id = ? ORDER BY trades.created_at DESC LIMIT 200`
-    )
-    .all(id) as {
+  const trades = await dbAll<{
     id: string;
     side: string;
     core_amount: number;
@@ -42,15 +36,25 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     ticker: string;
     token_id: string;
     created_at: number;
-  }[];
+  }>(
+    db,
+    `SELECT trades.*, tokens.ticker FROM trades
+     JOIN tokens ON tokens.id = trades.token_id
+     WHERE trades.wallet_id = $1 ORDER BY trades.created_at DESC LIMIT 200`,
+    [id]
+  );
 
-  const stakeEvents = db
-    .prepare("SELECT * FROM stake_events WHERE wallet_id = ? ORDER BY created_at DESC LIMIT 200")
-    .all(id) as { id: string; type: string; amount: number; created_at: number }[];
+  const stakeEvents = await dbAll<{ id: string; type: string; amount: number; created_at: number }>(
+    db,
+    "SELECT * FROM stake_events WHERE wallet_id = $1 ORDER BY created_at DESC LIMIT 200",
+    [id]
+  );
 
-  const deposits = db
-    .prepare("SELECT * FROM deposits WHERE wallet_id = ? ORDER BY created_at DESC LIMIT 200")
-    .all(id) as { id: string; amount: number; method: string; created_at: number }[];
+  const deposits = await dbAll<{ id: string; amount: number; method: string; created_at: number }>(
+    db,
+    "SELECT * FROM deposits WHERE wallet_id = $1 ORDER BY created_at DESC LIMIT 200",
+    [id]
+  );
 
   const history: HistoryEntry[] = [
     ...trades.map((t) => ({

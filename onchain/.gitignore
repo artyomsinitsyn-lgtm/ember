@@ -11,3 +11,7 @@ test-ledger
 # lib.rs), but the private key must never enter this repo. Used locally as ANCHOR_WALLET to
 # sign the one-time initialize_treasury_config call.
 treasury-wallet.json
+
+# Throwaway devnet-only deploy authority — holds no real value (devnet SOL only) but still a
+# private key, never committed on principle.
+devnet-deploy-key.json

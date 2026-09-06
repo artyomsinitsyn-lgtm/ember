@@ -1,100 +1,120 @@
-import Database from "better-sqlite3";
+import { type DB, dbGet, dbRun } from "./db";
 
 /** Credit pending ALLOY-staking rewards to a wallet's spendable CORE balance. */
-export function settleWallet(db: Database.Database, walletId: string) {
-  const pool = db.prepare("SELECT acc_core_per_embr FROM reward_pool WHERE id = 1").get() as {
-    acc_core_per_embr: number;
-  };
-  const pos = db
-    .prepare("SELECT staked, reward_debt FROM stake_positions WHERE wallet_id = ?")
-    .get(walletId) as { staked: number; reward_debt: number } | undefined;
+export async function settleWallet(db: DB, walletId: string): Promise<number> {
+  const pool = (await dbGet<{ acc_core_per_embr: number }>(
+    db,
+    "SELECT acc_core_per_embr FROM reward_pool WHERE id = 1"
+  ))!;
+  const pos = await dbGet<{ staked: number; reward_debt: number }>(
+    db,
+    "SELECT staked, reward_debt FROM stake_positions WHERE wallet_id = $1",
+    [walletId]
+  );
   if (!pos || pos.staked === 0) return 0;
 
   const accrued = pos.staked * pool.acc_core_per_embr - pos.reward_debt;
   if (accrued <= 0) return 0;
 
-  db.prepare("UPDATE wallets SET core_balance = core_balance + ? WHERE id = ?").run(accrued, walletId);
-  db.prepare(
-    "UPDATE stake_positions SET reward_debt = staked * ?, claimed_core = claimed_core + ? WHERE wallet_id = ?"
-  ).run(pool.acc_core_per_embr, accrued, walletId);
+  await dbRun(db, "UPDATE wallets SET core_balance = core_balance + $1 WHERE id = $2", [accrued, walletId]);
+  await dbRun(
+    db,
+    "UPDATE stake_positions SET reward_debt = staked * $1, claimed_core = claimed_core + $2 WHERE wallet_id = $3",
+    [pool.acc_core_per_embr, accrued, walletId]
+  );
   return accrued;
 }
 
-export function pendingRewards(db: Database.Database, walletId: string): number {
-  const pool = db.prepare("SELECT acc_core_per_embr FROM reward_pool WHERE id = 1").get() as {
-    acc_core_per_embr: number;
-  };
-  const pos = db
-    .prepare("SELECT staked, reward_debt FROM stake_positions WHERE wallet_id = ?")
-    .get(walletId) as { staked: number; reward_debt: number } | undefined;
+export async function pendingRewards(db: DB, walletId: string): Promise<number> {
+  const pool = (await dbGet<{ acc_core_per_embr: number }>(
+    db,
+    "SELECT acc_core_per_embr FROM reward_pool WHERE id = 1"
+  ))!;
+  const pos = await dbGet<{ staked: number; reward_debt: number }>(
+    db,
+    "SELECT staked, reward_debt FROM stake_positions WHERE wallet_id = $1",
+    [walletId]
+  );
   if (!pos || pos.staked === 0) return 0;
   return Math.max(0, pos.staked * pool.acc_core_per_embr - pos.reward_debt);
 }
 
 /** Route a trade's staker-fee cut into the pool, or to the treasury if nobody is staked yet. */
-export function distributeToStakers(db: Database.Database, coreAmount: number) {
+export async function distributeToStakers(db: DB, coreAmount: number) {
   if (coreAmount <= 0) return;
-  const pool = db.prepare("SELECT total_staked FROM reward_pool WHERE id = 1").get() as {
-    total_staked: number;
-  };
+  const pool = (await dbGet<{ total_staked: number }>(db, "SELECT total_staked FROM reward_pool WHERE id = 1"))!;
   if (pool.total_staked <= 0) {
-    db.prepare("UPDATE treasury SET core_balance = core_balance + ? WHERE id = 1").run(coreAmount);
+    await dbRun(db, "UPDATE treasury SET core_balance = core_balance + $1 WHERE id = 1", [coreAmount]);
     return;
   }
-  db.prepare(
+  await dbRun(
+    db,
     `UPDATE reward_pool
-     SET acc_core_per_embr = acc_core_per_embr + (? / total_staked),
-         lifetime_core_distributed = lifetime_core_distributed + ?
-     WHERE id = 1`
-  ).run(coreAmount, coreAmount);
+     SET acc_core_per_embr = acc_core_per_embr + ($1 / total_staked),
+         lifetime_core_distributed = lifetime_core_distributed + $2
+     WHERE id = 1`,
+    [coreAmount, coreAmount]
+  );
 }
 
-export function stake(db: Database.Database, walletId: string, amount: number) {
+export async function stake(db: DB, walletId: string, amount: number) {
   if (amount <= 0) throw new Error("Amount must be positive");
-  const wallet = db.prepare("SELECT embr_balance FROM wallets WHERE id = ?").get(walletId) as
-    | { embr_balance: number }
-    | undefined;
+  const wallet = await dbGet<{ embr_balance: number }>(
+    db,
+    "SELECT embr_balance FROM wallets WHERE id = $1 FOR UPDATE",
+    [walletId]
+  );
   if (!wallet || wallet.embr_balance < amount) throw new Error("Insufficient ALLOY balance");
 
-  settleWallet(db, walletId);
-  db.prepare(
-    `INSERT INTO stake_positions (wallet_id, staked, reward_debt, claimed_core) VALUES (?, ?, 0, 0)
-     ON CONFLICT(wallet_id) DO UPDATE SET staked = staked + excluded.staked`
-  ).run(walletId, amount);
-
-  const pool = db.prepare("SELECT acc_core_per_embr FROM reward_pool WHERE id = 1").get() as {
-    acc_core_per_embr: number;
-  };
-  db.prepare("UPDATE stake_positions SET reward_debt = staked * ? WHERE wallet_id = ?").run(
-    pool.acc_core_per_embr,
-    walletId
+  await settleWallet(db, walletId);
+  await dbRun(
+    db,
+    `INSERT INTO stake_positions (wallet_id, staked, reward_debt, claimed_core) VALUES ($1, $2, 0, 0)
+     ON CONFLICT (wallet_id) DO UPDATE SET staked = stake_positions.staked + EXCLUDED.staked`,
+    [walletId, amount]
   );
-  db.prepare("UPDATE wallets SET embr_balance = embr_balance - ? WHERE id = ?").run(amount, walletId);
-  db.prepare("UPDATE reward_pool SET total_staked = total_staked + ? WHERE id = 1").run(amount);
-  db.prepare(
-    "INSERT INTO stake_events (id, wallet_id, type, amount, created_at) VALUES (?, ?, 'stake', ?, ?)"
-  ).run(crypto.randomUUID(), walletId, amount, Date.now());
+
+  const pool = (await dbGet<{ acc_core_per_embr: number }>(
+    db,
+    "SELECT acc_core_per_embr FROM reward_pool WHERE id = 1"
+  ))!;
+  await dbRun(db, "UPDATE stake_positions SET reward_debt = staked * $1 WHERE wallet_id = $2", [
+    pool.acc_core_per_embr,
+    walletId,
+  ]);
+  await dbRun(db, "UPDATE wallets SET embr_balance = embr_balance - $1 WHERE id = $2", [amount, walletId]);
+  await dbRun(db, "UPDATE reward_pool SET total_staked = total_staked + $1 WHERE id = 1", [amount]);
+  await dbRun(
+    db,
+    "INSERT INTO stake_events (id, wallet_id, type, amount, created_at) VALUES ($1, $2, 'stake', $3, $4)",
+    [crypto.randomUUID(), walletId, amount, Date.now()]
+  );
 }
 
-export function unstake(db: Database.Database, walletId: string, amount: number) {
+export async function unstake(db: DB, walletId: string, amount: number) {
   if (amount <= 0) throw new Error("Amount must be positive");
-  const pos = db.prepare("SELECT staked FROM stake_positions WHERE wallet_id = ?").get(walletId) as
-    | { staked: number }
-    | undefined;
+  const pos = await dbGet<{ staked: number }>(
+    db,
+    "SELECT staked FROM stake_positions WHERE wallet_id = $1 FOR UPDATE",
+    [walletId]
+  );
   if (!pos || pos.staked < amount) throw new Error("Insufficient staked ALLOY");
 
-  settleWallet(db, walletId);
-  db.prepare("UPDATE stake_positions SET staked = staked - ? WHERE wallet_id = ?").run(amount, walletId);
-  const pool = db.prepare("SELECT acc_core_per_embr FROM reward_pool WHERE id = 1").get() as {
-    acc_core_per_embr: number;
-  };
-  db.prepare("UPDATE stake_positions SET reward_debt = staked * ? WHERE wallet_id = ?").run(
+  await settleWallet(db, walletId);
+  await dbRun(db, "UPDATE stake_positions SET staked = staked - $1 WHERE wallet_id = $2", [amount, walletId]);
+  const pool = (await dbGet<{ acc_core_per_embr: number }>(
+    db,
+    "SELECT acc_core_per_embr FROM reward_pool WHERE id = 1"
+  ))!;
+  await dbRun(db, "UPDATE stake_positions SET reward_debt = staked * $1 WHERE wallet_id = $2", [
     pool.acc_core_per_embr,
-    walletId
+    walletId,
+  ]);
+  await dbRun(db, "UPDATE wallets SET embr_balance = embr_balance + $1 WHERE id = $2", [amount, walletId]);
+  await dbRun(db, "UPDATE reward_pool SET total_staked = total_staked - $1 WHERE id = 1", [amount]);
+  await dbRun(
+    db,
+    "INSERT INTO stake_events (id, wallet_id, type, amount, created_at) VALUES ($1, $2, 'unstake', $3, $4)",
+    [crypto.randomUUID(), walletId, amount, Date.now()]
   );
-  db.prepare("UPDATE wallets SET embr_balance = embr_balance + ? WHERE id = ?").run(amount, walletId);
-  db.prepare("UPDATE reward_pool SET total_staked = total_staked - ? WHERE id = 1").run(amount);
-  db.prepare(
-    "INSERT INTO stake_events (id, wallet_id, type, amount, created_at) VALUES (?, ?, 'unstake', ?, ?)"
-  ).run(crypto.randomUUID(), walletId, amount, Date.now());
 }

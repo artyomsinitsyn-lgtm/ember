@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getDb, dbGet } from "@/lib/db";
 import { confirmVerificationCode } from "@/lib/verification";
 import { getSessionWalletId } from "@/lib/auth";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const db = getDb();
+  const db = await getDb();
 
-  const existing = db.prepare("SELECT id FROM wallets WHERE id = ?").get(id);
+  const existing = await dbGet(db, "SELECT id FROM wallets WHERE id = $1", [id]);
   if (!existing) return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
 
   const sessionWalletId = await getSessionWalletId();
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const code = typeof body.code === "string" ? body.code.trim() : "";
   if (!code) return NextResponse.json({ error: "Enter the code" }, { status: 400 });
 
-  const result = confirmVerificationCode(id, code);
+  const result = await confirmVerificationCode(id, code);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
 
   return NextResponse.json({ ok: true });

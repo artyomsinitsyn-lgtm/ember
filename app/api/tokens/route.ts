@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PublicKey } from "@solana/web3.js";
-import { getDb } from "@/lib/db";
+import { getDb, dbGet, dbAll, dbRun } from "@/lib/db";
 import { serializeToken } from "@/lib/serialize";
 import { assessRugRisk } from "@/lib/rugDetection";
 import { computeWalletProfile } from "@/lib/profile";
@@ -13,48 +13,48 @@ import type { TokenRow } from "@/lib/trading";
 import { TOTAL_SUPPLY, YOU_WALLET_ID } from "@/lib/constants";
 
 export async function GET() {
-  const db = getDb();
-  const rows = db
-    .prepare(
-      `SELECT tokens.*, wallets.name as creator_name
-       FROM tokens JOIN wallets ON wallets.id = tokens.creator_id
-       ORDER BY tokens.created_at DESC`
-    )
-    .all() as (TokenRow & { creator_name: string })[];
+  const db = await getDb();
+  const rows = await dbAll<TokenRow & { creator_name: string }>(
+    db,
+    `SELECT tokens.*, wallets.name as creator_name
+     FROM tokens JOIN wallets ON wallets.id = tokens.creator_id
+     ORDER BY tokens.created_at DESC`
+  );
 
   // A token is "verified" via its creator's own verified badge (confirmed contact +
   // profit threshold) — there's no separate token-level verification, so this is cached
   // per creator to avoid recomputing the same wallet profile for every one of their tokens.
   const creatorVerifiedCache = new Map<string, boolean>();
-  const isCreatorVerified = (creatorId: string) => {
+  const isCreatorVerified = async (creatorId: string) => {
     if (!creatorVerifiedCache.has(creatorId)) {
-      creatorVerifiedCache.set(creatorId, computeWalletProfile(db, creatorId)?.verified ?? false);
+      creatorVerifiedCache.set(creatorId, (await computeWalletProfile(db, creatorId))?.verified ?? false);
     }
     return creatorVerifiedCache.get(creatorId)!;
   };
 
-  const reputations = reputationBatch(db, rows.map((r) => r.creator_id));
-  const backerCounts = computeBackerCounts(db);
-  const growthDeltas = computeGrowthDeltas(db);
-  const projectMetaRows = db.prepare("SELECT token_id, tagline, roadmap_json FROM projects").all() as {
-    token_id: string;
-    tagline: string | null;
-    roadmap_json: string | null;
-  }[];
+  const reputations = await reputationBatch(db, rows.map((r) => r.creator_id));
+  const backerCounts = await computeBackerCounts(db);
+  const growthDeltas = await computeGrowthDeltas(db);
+  const projectMetaRows = await dbAll<{ token_id: string; tagline: string | null; roadmap_json: string | null }>(
+    db,
+    "SELECT token_id, tagline, roadmap_json FROM projects"
+  );
   const projectMetaById = new Map(
     projectMetaRows.map((p) => [p.token_id, { tagline: p.tagline, hasRoadmap: !!p.roadmap_json && p.roadmap_json !== "[]" }])
   );
 
-  const tokens = rows.map((r) =>
-    serializeToken(
-      r,
-      r.creator_name,
-      assessRugRisk(db, r.id).riskLevel,
-      isCreatorVerified(r.creator_id),
-      projectMetaById.get(r.id) ?? null,
-      reputations.get(r.creator_id)?.tier ?? "new",
-      backerCounts.get(r.id) ?? 0,
-      growthDeltas.get(r.id)?.delta ?? 0
+  const tokens = await Promise.all(
+    rows.map(async (r) =>
+      serializeToken(
+        r,
+        r.creator_name,
+        (await assessRugRisk(db, r.id)).riskLevel,
+        await isCreatorVerified(r.creator_id),
+        projectMetaById.get(r.id) ?? null,
+        reputations.get(r.creator_id)?.tier ?? "new",
+        backerCounts.get(r.id) ?? 0,
+        growthDeltas.get(r.id)?.delta ?? 0
+      )
     )
   );
   return NextResponse.json({ tokens });
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const db = getDb();
+  const db = await getDb();
   const id = mintAddress.toBase58();
   const now = Date.now();
 
@@ -123,33 +123,35 @@ export async function POST(req: NextRequest) {
   // INSERT itself is the atomic uniqueness check — two concurrent registration attempts for
   // the same mint can't both succeed, regardless of ordering.
   try {
-    db.prepare(
+    await dbRun(
+      db,
       `INSERT INTO tokens (id, ticker, name, description, image, creator_id, v_core, v_token, real_core, real_token, total_supply, graduated, graduated_at, pool_core, pool_token, created_at, twitter, telegram, website)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, NULL, NULL, ?, ?, ?, ?)`
-    ).run(
-      id,
-      ticker,
-      name,
-      description,
-      image,
-      creatorId,
-      onchainCurve.virtualCore,
-      onchainCurve.virtualToken,
-      onchainCurve.realCore,
-      onchainCurve.realToken,
-      TOTAL_SUPPLY,
-      now,
-      twitter,
-      telegram,
-      website
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, NULL, NULL, NULL, $12, $13, $14, $15)`,
+      [
+        id,
+        ticker,
+        name,
+        description,
+        image,
+        creatorId,
+        onchainCurve.virtualCore,
+        onchainCurve.virtualToken,
+        onchainCurve.realCore,
+        onchainCurve.realToken,
+        TOTAL_SUPPLY,
+        now,
+        twitter,
+        telegram,
+        website,
+      ]
     );
   } catch (err) {
-    if (err instanceof Error && /UNIQUE constraint failed/.test(err.message)) {
+    if (err && typeof err === "object" && "code" in err && err.code === "23505") {
       return NextResponse.json({ error: "Token already registered" }, { status: 409 });
     }
     throw err;
   }
 
-  const row = db.prepare("SELECT * FROM tokens WHERE id = ?").get(id) as TokenRow;
+  const row = (await dbGet<TokenRow>(db, "SELECT * FROM tokens WHERE id = $1", [id]))!;
   return NextResponse.json({ token: serializeToken(row) }, { status: 201 });
 }

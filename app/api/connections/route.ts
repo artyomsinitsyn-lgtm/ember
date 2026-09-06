@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getDb, dbGet, dbAll, dbRun } from "@/lib/db";
 import { computeWalletProfile } from "@/lib/profile";
 import { checkOutboundRateLimit } from "@/lib/connections";
 import { getSessionWalletId } from "@/lib/auth";
@@ -24,41 +24,47 @@ export async function GET(req: NextRequest) {
   const sessionWalletId = await getSessionWalletId();
   const isOwner = sessionWalletId === walletId;
 
-  const db = getDb();
-  const rows = db
-    .prepare(
-      `SELECT * FROM connections WHERE requester_id = ? OR recipient_id = ? ORDER BY created_at DESC`
-    )
-    .all(walletId, walletId) as ConnectionRow[];
+  const db = await getDb();
+  const rows = await dbAll<ConnectionRow>(
+    db,
+    `SELECT * FROM connections WHERE requester_id = $1 OR recipient_id = $1 ORDER BY created_at DESC`,
+    [walletId]
+  );
 
   const incoming = isOwner
-    ? rows
-        .filter((r) => r.recipient_id === walletId && r.status === "pending")
-        .map((r) => ({ id: r.id, wallet: computeWalletProfile(db, r.requester_id), createdAt: r.created_at }))
+    ? await Promise.all(
+        rows
+          .filter((r) => r.recipient_id === walletId && r.status === "pending")
+          .map(async (r) => ({ id: r.id, wallet: await computeWalletProfile(db, r.requester_id), createdAt: r.created_at }))
+      )
     : [];
 
   const outgoing = isOwner
-    ? rows
-        .filter((r) => r.requester_id === walletId && r.status === "pending")
-        .map((r) => ({ id: r.id, wallet: computeWalletProfile(db, r.recipient_id), createdAt: r.created_at }))
+    ? await Promise.all(
+        rows
+          .filter((r) => r.requester_id === walletId && r.status === "pending")
+          .map(async (r) => ({ id: r.id, wallet: await computeWalletProfile(db, r.recipient_id), createdAt: r.created_at }))
+      )
     : [];
 
-  const accepted = rows
-    .filter((r) => r.status === "accepted")
-    .map((r) => {
-      const otherId = r.requester_id === walletId ? r.recipient_id : r.requester_id;
-      const otherWallet = isOwner
-        ? (db.prepare("SELECT external_contact FROM wallets WHERE id = ?").get(otherId) as
-            | { external_contact: string | null }
-            | undefined)
-        : undefined;
-      return {
-        id: r.id,
-        wallet: computeWalletProfile(db, otherId),
-        externalContact: otherWallet?.external_contact ?? null,
-        respondedAt: r.responded_at,
-      };
-    });
+  const accepted = await Promise.all(
+    rows
+      .filter((r) => r.status === "accepted")
+      .map(async (r) => {
+        const otherId = r.requester_id === walletId ? r.recipient_id : r.requester_id;
+        const otherWallet = isOwner
+          ? await dbGet<{ external_contact: string | null }>(db, "SELECT external_contact FROM wallets WHERE id = $1", [
+              otherId,
+            ])
+          : undefined;
+        return {
+          id: r.id,
+          wallet: await computeWalletProfile(db, otherId),
+          externalContact: otherWallet?.external_contact ?? null,
+          respondedAt: r.responded_at,
+        };
+      })
+  );
 
   return NextResponse.json({ incoming, outgoing, accepted });
 }
@@ -71,13 +77,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const db = getDb();
-  const recipient = db.prepare("SELECT id, verified_only_messages FROM wallets WHERE id = ?").get(recipientId) as
-    | { id: string; verified_only_messages: number }
-    | undefined;
+  const db = await getDb();
+  const recipient = await dbGet<{ id: string; verified_only_messages: number }>(
+    db,
+    "SELECT id, verified_only_messages FROM wallets WHERE id = $1",
+    [recipientId]
+  );
   if (!recipient) return NextResponse.json({ error: "Recipient not found" }, { status: 404 });
 
-  const requesterProfile = computeWalletProfile(db, requesterId);
+  const requesterProfile = await computeWalletProfile(db, requesterId);
 
   if (recipient.verified_only_messages && !requesterProfile?.verified) {
     return NextResponse.json(
@@ -86,25 +94,27 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const rateLimit = checkOutboundRateLimit(db, requesterId, !!requesterProfile?.verified);
+  const rateLimit = await checkOutboundRateLimit(db, requesterId, !!requesterProfile?.verified);
   if (!rateLimit.ok) {
     return NextResponse.json({ error: rateLimit.error }, { status: 429 });
   }
 
-  const existing = db
-    .prepare(
-      `SELECT id, status FROM connections
-       WHERE (requester_id = ? AND recipient_id = ?) OR (requester_id = ? AND recipient_id = ?)`
-    )
-    .get(requesterId, recipientId, recipientId, requesterId) as { id: string; status: string } | undefined;
+  const existing = await dbGet<{ id: string; status: string }>(
+    db,
+    `SELECT id, status FROM connections
+     WHERE (requester_id = $1 AND recipient_id = $2) OR (requester_id = $2 AND recipient_id = $1)`,
+    [requesterId, recipientId]
+  );
   if (existing) {
     return NextResponse.json({ error: `A connection already exists (${existing.status}).` }, { status: 409 });
   }
 
   const id = `conn_${crypto.randomUUID().slice(0, 8)}`;
-  db.prepare(
-    `INSERT INTO connections (id, requester_id, recipient_id, status, created_at) VALUES (?, ?, ?, 'pending', ?)`
-  ).run(id, requesterId, recipientId, Date.now());
+  await dbRun(
+    db,
+    `INSERT INTO connections (id, requester_id, recipient_id, status, created_at) VALUES ($1, $2, $3, 'pending', $4)`,
+    [id, requesterId, recipientId, Date.now()]
+  );
 
   return NextResponse.json({ ok: true, id }, { status: 201 });
 }

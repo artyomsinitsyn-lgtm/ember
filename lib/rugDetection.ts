@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import { type DB, dbGet, dbAll } from "./db";
 
 export interface ClusterFlag {
   walletIds: string[];
@@ -29,14 +29,14 @@ const MIN_COORDINATED_BURST_WALLETS = 4;
 const HIGH_RISK_CLUSTER_PCT = 20;
 const MEDIUM_RISK_CLUSTER_PCT = 10;
 
-export function assessRugRisk(db: Database.Database, tokenId: string): RugAssessment {
-  const holders = db
-    .prepare(
-      `SELECT holdings.wallet_id, wallets.name, wallets.funded_by, holdings.amount
-       FROM holdings JOIN wallets ON wallets.id = holdings.wallet_id
-       WHERE token_id = ? AND amount > 0.0001`
-    )
-    .all(tokenId) as { wallet_id: string; name: string; funded_by: string | null; amount: number }[];
+export async function assessRugRisk(db: DB, tokenId: string): Promise<RugAssessment> {
+  const holders = await dbAll<{ wallet_id: string; name: string; funded_by: string | null; amount: number }>(
+    db,
+    `SELECT holdings.wallet_id, wallets.name, wallets.funded_by, holdings.amount
+     FROM holdings JOIN wallets ON wallets.id = holdings.wallet_id
+     WHERE token_id = $1 AND amount > 0.0001`,
+    [tokenId]
+  );
 
   const circulating = holders.reduce((sum, h) => sum + h.amount, 0);
   const pctOf = (amount: number) => (circulating > 0 ? (amount / circulating) * 100 : 0);
@@ -56,7 +56,7 @@ export function assessRugRisk(db: Database.Database, tokenId: string): RugAssess
   for (const [funderId, group] of byFunder) {
     if (group.length < MIN_CLUSTER_SIZE) continue;
     const combinedPct = group.reduce((sum, h) => sum + pctOf(h.amount), 0);
-    const funder = db.prepare("SELECT name FROM wallets WHERE id = ?").get(funderId) as { name: string } | undefined;
+    const funder = await dbGet<{ name: string }>(db, "SELECT name FROM wallets WHERE id = $1", [funderId]);
     clusters.push({
       walletIds: group.map((h) => h.wallet_id),
       walletNames: group.map((h) => h.name),
@@ -68,12 +68,12 @@ export function assessRugRisk(db: Database.Database, tokenId: string): RugAssess
 
   // Coordinated trading: repeated bursts of several distinct wallets all buying inside
   // the same short window, regardless of funding history.
-  const buys = db
-    .prepare(
-      `SELECT trades.wallet_id, trades.created_at
-       FROM trades WHERE token_id = ? AND side = 'buy' ORDER BY created_at ASC`
-    )
-    .all(tokenId) as { wallet_id: string; created_at: number }[];
+  const buys = await dbAll<{ wallet_id: string; created_at: number }>(
+    db,
+    `SELECT trades.wallet_id, trades.created_at
+     FROM trades WHERE token_id = $1 AND side = 'buy' ORDER BY created_at ASC`,
+    [tokenId]
+  );
 
   const alreadyFlagged = new Set(clusters.flatMap((c) => c.walletIds));
   const coordinatedWallets = new Set<string>();

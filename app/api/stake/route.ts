@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getDb, dbGet, withTransaction } from "@/lib/db";
 import { stake, unstake } from "@/lib/rewards";
 import { getSessionWalletId } from "@/lib/auth";
 import { getConnection, stakerPoolPda } from "@/lib/onchain/program";
@@ -10,10 +10,11 @@ import { getConnection, stakerPoolPda } from "@/lib/onchain/program";
 // exactly what they should be able to verify. onchainStakerPoolLamports is that real, aggregate
 // balance — never a per-wallet share, since no on-chain staking/claim accounting exists yet.
 export async function GET() {
-  const db = getDb();
-  const pool = db
-    .prepare("SELECT total_staked, acc_core_per_embr, lifetime_core_distributed FROM reward_pool WHERE id = 1")
-    .get();
+  const db = await getDb();
+  const pool = await dbGet(
+    db,
+    "SELECT total_staked, acc_core_per_embr, lifetime_core_distributed FROM reward_pool WHERE id = 1"
+  );
   const connection = await getConnection();
   const onchainStakerPoolLamports = await connection.getBalance(stakerPoolPda()).catch(() => null);
   return NextResponse.json({ pool, onchainStakerPoolLamports });
@@ -29,12 +30,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
   }
 
-  const db = getDb();
   try {
-    db.transaction(() => {
-      if (action === "stake") stake(db, walletId, amount);
-      else unstake(db, walletId, amount);
-    })();
+    await withTransaction(async (client) => {
+      if (action === "stake") await stake(client, walletId, amount);
+      else await unstake(client, walletId, amount);
+    });
     return NextResponse.json({ ok: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Staking action failed";

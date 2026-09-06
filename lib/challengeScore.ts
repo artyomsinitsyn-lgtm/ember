@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import { type DB, dbAll } from "./db";
 import { assessRugRisk } from "./rugDetection";
 import { CHALLENGE_ELIGIBILITY_HOURS } from "./constants";
 
@@ -21,18 +21,22 @@ const ELIGIBILITY_WINDOW_MS = CHALLENGE_ELIGIBILITY_HOURS * 60 * 60 * 1000;
  * with wallets from detected funding/coordination clusters excluded entirely, rather than
  * raw trade count or vote totals that one wash-trading wallet (or a vote button) can inflate.
  */
-export function computeChallengeScore(db: Database.Database, tokenId: string, createdAt: number): ChallengeScore {
-  const rug = assessRugRisk(db, tokenId);
+export async function computeChallengeScore(db: DB, tokenId: string, createdAt: number): Promise<ChallengeScore> {
+  const rug = await assessRugRisk(db, tokenId);
   const flagged = new Set(rug.clusters.flatMap((c) => c.walletIds));
 
-  const holders = db
-    .prepare(`SELECT wallet_id, amount FROM holdings WHERE token_id = ? AND amount > 0.0001`)
-    .all(tokenId) as { wallet_id: string; amount: number }[];
+  const holders = await dbAll<{ wallet_id: string; amount: number }>(
+    db,
+    `SELECT wallet_id, amount FROM holdings WHERE token_id = $1 AND amount > 0.0001`,
+    [tokenId]
+  );
   const distinctFundedHolders = holders.filter((h) => !flagged.has(h.wallet_id)).length;
 
-  const trades = db
-    .prepare(`SELECT wallet_id, core_amount, created_at FROM trades WHERE token_id = ?`)
-    .all(tokenId) as { wallet_id: string; core_amount: number; created_at: number }[];
+  const trades = await dbAll<{ wallet_id: string; core_amount: number; created_at: number }>(
+    db,
+    `SELECT wallet_id, core_amount, created_at FROM trades WHERE token_id = $1`,
+    [tokenId]
+  );
   const legitTrades = trades.filter((t) => !flagged.has(t.wallet_id));
   const legitVolume = legitTrades.reduce((sum, t) => sum + t.core_amount, 0);
 

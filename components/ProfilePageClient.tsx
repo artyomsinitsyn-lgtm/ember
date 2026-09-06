@@ -6,7 +6,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { Pencil, ImagePlus, Loader2, ShieldCheck, BadgeCheck, Wallet2, Users, Copy, Check } from "lucide-react";
 import { formatCompact, formatUsd, timeAgo } from "@/lib/format";
 import { STAKE_TICKER, VERIFIED_PROFIT_THRESHOLD } from "@/lib/constants";
-import { REPUTATION_TIER_LABEL } from "@/lib/reputation";
+import { REPUTATION_TIER_LABEL } from "@/lib/reputationTier";
 import type { WalletProfile } from "@/lib/profile";
 import type { WalletPosition } from "@/lib/positions";
 import { useConnectedWalletId } from "@/lib/useConnectedWallet";

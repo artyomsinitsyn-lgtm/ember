@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import { type DB, dbGet, dbAll, dbRun } from "./db";
 import { currentPrice } from "./bondingCurve";
 import type { TokenRow } from "./trading";
 import { VERIFIED_PROFIT_THRESHOLD } from "./constants";
@@ -43,103 +43,111 @@ export interface WalletProfile {
  * lazily creates that request the first time a wallet becomes eligible (a unique index on
  * wallet_id keeps it to one row per wallet), and otherwise just reports whatever the existing
  * row says. */
-function verificationStatus(
-  db: Database.Database,
+async function verificationStatus(
+  db: DB,
   walletId: string,
   eligible: boolean
-): "none" | "pending" | "approved" | "rejected" {
-  const existing = db.prepare("SELECT status FROM verification_requests WHERE wallet_id = ?").get(walletId) as
-    | { status: "pending" | "approved" | "rejected" }
-    | undefined;
+): Promise<"none" | "pending" | "approved" | "rejected"> {
+  const existing = await dbGet<{ status: "pending" | "approved" | "rejected" }>(
+    db,
+    "SELECT status FROM verification_requests WHERE wallet_id = $1",
+    [walletId]
+  );
   if (existing) return existing.status;
   if (!eligible) return "none";
 
   const id = `vreq_${crypto.randomUUID().slice(0, 10)}`;
-  db.prepare("INSERT INTO verification_requests (id, wallet_id, status, created_at) VALUES (?, ?, 'pending', ?)").run(
+  await dbRun(db, "INSERT INTO verification_requests (id, wallet_id, status, created_at) VALUES ($1, $2, 'pending', $3)", [
     id,
     walletId,
-    Date.now()
-  );
+    Date.now(),
+  ]);
   return "pending";
 }
 
-export function computeWalletProfile(db: Database.Database, walletId: string): WalletProfile | null {
-  const wallet = db.prepare("SELECT * FROM wallets WHERE id = ?").get(walletId) as
-    | {
-        id: string;
-        name: string;
-        avatar: string;
-        core_balance: number;
-        embr_balance: number;
-        created_at: number;
-        contact: string | null;
-        contact_type: "phone" | "email" | null;
-        contact_verified_at: number | null;
-        verified_only_messages: number;
-        twitter_handle: string | null;
-        bio: string | null;
-        banner: string | null;
-        banner_preset: string | null;
-      }
-    | undefined;
+export async function computeWalletProfile(db: DB, walletId: string): Promise<WalletProfile | null> {
+  const wallet = await dbGet<{
+    id: string;
+    name: string;
+    avatar: string;
+    core_balance: number;
+    embr_balance: number;
+    created_at: number;
+    contact: string | null;
+    contact_type: "phone" | "email" | null;
+    contact_verified_at: number | null;
+    verified_only_messages: number;
+    twitter_handle: string | null;
+    bio: string | null;
+    banner: string | null;
+    banner_preset: string | null;
+  }>(db, "SELECT * FROM wallets WHERE id = $1", [walletId]);
   if (!wallet) return null;
 
-  const holdingRows = db
-    .prepare(
-      `SELECT holdings.amount, tokens.* FROM holdings
-       JOIN tokens ON tokens.id = holdings.token_id
-       WHERE holdings.wallet_id = ? AND holdings.amount > 0.0001`
-    )
-    .all(walletId) as (TokenRow & { amount: number })[];
+  const holdingRows = await dbAll<TokenRow & { amount: number }>(
+    db,
+    `SELECT holdings.amount, tokens.* FROM holdings
+     JOIN tokens ON tokens.id = holdings.token_id
+     WHERE holdings.wallet_id = $1 AND holdings.amount > 0.0001`,
+    [walletId]
+  );
 
   const portfolioValue = holdingRows.reduce((sum, h) => {
     const price = h.graduated ? currentPrice(h.pool_core!, h.pool_token!) : currentPrice(h.v_core, h.v_token);
     return sum + price * h.amount;
   }, 0);
 
-  const tradeAgg = db
-    .prepare(
-      `SELECT
-         COALESCE(SUM(CASE WHEN side = 'buy' THEN core_amount ELSE 0 END), 0) as buyVolume,
-         COALESCE(SUM(CASE WHEN side = 'sell' THEN core_amount ELSE 0 END), 0) as sellVolume,
-         COUNT(*) as tradeCount
-       FROM trades WHERE wallet_id = ?`
-    )
-    .get(walletId) as { buyVolume: number; sellVolume: number; tradeCount: number };
+  const tradeAgg = (await dbGet<{ buyVolume: number; sellVolume: number; tradeCount: number }>(
+    db,
+    `SELECT
+       COALESCE(SUM(CASE WHEN side = 'buy' THEN core_amount ELSE 0 END), 0) as "buyVolume",
+       COALESCE(SUM(CASE WHEN side = 'sell' THEN core_amount ELSE 0 END), 0) as "sellVolume",
+       COUNT(*) as "tradeCount"
+     FROM trades WHERE wallet_id = $1`,
+    [walletId]
+  ))!;
 
   // Net cash flow (sell proceeds minus buy cost), not a cost-basis-lot realized P&L —
   // an honest, simple "how much they've net taken out of trading" figure.
   const realizedPnl = tradeAgg.sellVolume - tradeAgg.buyVolume;
   const totalVolume = tradeAgg.buyVolume + tradeAgg.sellVolume;
 
-  const createdCount = db.prepare("SELECT COUNT(*) as c FROM tokens WHERE creator_id = ?").get(walletId) as {
-    c: number;
-  };
-  const graduatedCount = db
-    .prepare("SELECT COUNT(*) as c FROM tokens WHERE creator_id = ? AND graduated = 1")
-    .get(walletId) as { c: number };
+  const createdCount = (await dbGet<{ c: number }>(db, "SELECT COUNT(*) as c FROM tokens WHERE creator_id = $1", [
+    walletId,
+  ]))!;
+  const graduatedCount = (await dbGet<{ c: number }>(
+    db,
+    "SELECT COUNT(*) as c FROM tokens WHERE creator_id = $1 AND graduated = 1",
+    [walletId]
+  ))!;
 
-  const stakePos = db
-    .prepare("SELECT staked, claimed_core FROM stake_positions WHERE wallet_id = ?")
-    .get(walletId) as { staked: number; claimed_core: number } | undefined;
+  const stakePos = await dbGet<{ staked: number; claimed_core: number }>(
+    db,
+    "SELECT staked, claimed_core FROM stake_positions WHERE wallet_id = $1",
+    [walletId]
+  );
 
   // "Followers"/"following" reuse the connections graph's own requester/recipient
   // direction — a wallet's followers are the accepted connections it didn't initiate,
   // following is the ones it did. Not a separate social graph, just this one read two ways.
   const followers = (
-    db
-      .prepare("SELECT COUNT(*) as c FROM connections WHERE recipient_id = ? AND status = 'accepted'")
-      .get(walletId) as { c: number }
-  ).c;
+    await dbGet<{ c: number }>(
+      db,
+      "SELECT COUNT(*) as c FROM connections WHERE recipient_id = $1 AND status = 'accepted'",
+      [walletId]
+    )
+  )!.c;
   const following = (
-    db
-      .prepare("SELECT COUNT(*) as c FROM connections WHERE requester_id = ? AND status = 'accepted'")
-      .get(walletId) as { c: number }
-  ).c;
+    await dbGet<{ c: number }>(
+      db,
+      "SELECT COUNT(*) as c FROM connections WHERE requester_id = $1 AND status = 'accepted'",
+      [walletId]
+    )
+  )!.c;
 
   const contactVerified = wallet.contact_verified_at != null;
   const profitThresholdMet = realizedPnl >= VERIFIED_PROFIT_THRESHOLD;
-  const reqStatus = verificationStatus(db, walletId, contactVerified && profitThresholdMet);
+  const reqStatus = await verificationStatus(db, walletId, contactVerified && profitThresholdMet);
 
   return {
     walletId: wallet.id,
@@ -161,7 +169,7 @@ export function computeWalletProfile(db: Database.Database, walletId: string): W
     following,
     tokensCreated: createdCount.c,
     tokensGraduated: graduatedCount.c,
-    reputationTier: computeCreatorReputation(db, walletId).tier,
+    reputationTier: (await computeCreatorReputation(db, walletId)).tier,
     staked: stakePos?.staked ?? 0,
     lifetimeClaimed: stakePos?.claimed_core ?? 0,
     createdAt: wallet.created_at,
@@ -176,11 +184,11 @@ export function computeWalletProfile(db: Database.Database, walletId: string): W
   };
 }
 
-export function getLeaderboard(db: Database.Database, limit = 50): WalletProfile[] {
-  const ids = db.prepare("SELECT id FROM wallets").all() as { id: string }[];
-  const profiles = ids
-    .map((w) => computeWalletProfile(db, w.id))
-    .filter((p): p is WalletProfile => p !== null);
+export async function getLeaderboard(db: DB, limit = 50): Promise<WalletProfile[]> {
+  const ids = await dbAll<{ id: string }>(db, "SELECT id FROM wallets");
+  const profiles = (await Promise.all(ids.map((w) => computeWalletProfile(db, w.id)))).filter(
+    (p): p is WalletProfile => p !== null
+  );
   return profiles.sort((a, b) => b.netWorth - a.netWorth).slice(0, limit);
 }
 

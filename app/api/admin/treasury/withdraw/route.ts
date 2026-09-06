@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getDb, dbGet, dbRun } from "@/lib/db";
 import { getConnection, treasuryPda, PROGRAM_ID, LAMPORTS_PER_SOL } from "@/lib/onchain/program";
 import { getSessionWalletId } from "@/lib/auth";
 import { isAppAdmin } from "@/lib/admin";
@@ -24,8 +24,8 @@ export async function POST(req: NextRequest) {
   const signature = String(body.signature || "");
   if (!signature) return NextResponse.json({ error: "Missing signature" }, { status: 400 });
 
-  const db = getDb();
-  if (db.prepare("SELECT 1 FROM treasury_withdrawals WHERE signature = ?").get(signature)) {
+  const db = await getDb();
+  if (await dbGet(db, "SELECT 1 FROM treasury_withdrawals WHERE signature = $1", [signature])) {
     return NextResponse.json({ ok: true, alreadyRecorded: true });
   }
 
@@ -62,13 +62,13 @@ export async function POST(req: NextRequest) {
   const toWallet = accountKeys.staticAccountKeys[destIdx].toBase58();
 
   const now = Date.now();
-  db.prepare("INSERT INTO treasury_withdrawals (signature, to_wallet, amount, created_at) VALUES (?, ?, ?, ?)").run(
+  await dbRun(db, "INSERT INTO treasury_withdrawals (signature, to_wallet, amount, created_at) VALUES ($1, $2, $3, $4)", [
     signature,
     toWallet,
     amount,
-    now
-  );
-  db.prepare("UPDATE treasury SET core_balance = MAX(0, core_balance - ?) WHERE id = 1").run(amount);
+    now,
+  ]);
+  await dbRun(db, "UPDATE treasury SET core_balance = GREATEST(0, core_balance - $1) WHERE id = 1", [amount]);
 
   return NextResponse.json({ ok: true, amount, to: toWallet });
 }

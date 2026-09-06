@@ -12,7 +12,10 @@ export interface AnchorWalletLike {
   signAllTransactions<T extends Transaction | VersionedTransaction>(txs: T[]): Promise<T[]>;
 }
 
-export const SOLANA_RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "http://127.0.0.1:8899";
+// Devnet by default: we're demoing/launching on devnet first (test SOL, zero real funds at
+// risk) before any mainnet decision. Point NEXT_PUBLIC_SOLANA_RPC_URL at a local validator or
+// mainnet explicitly if you need one of those instead.
+export const SOLANA_RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.devnet.solana.com";
 export const PROGRAM_ID = new PublicKey(rawIdl.address);
 
 /** Ordered RPC endpoints to try — primary first, then any fallbacks. A single RPC provider

@@ -1,5 +1,5 @@
 import { History, Layers, ShieldAlert } from "lucide-react";
-import { REPUTATION_TIER_LABEL, type ReputationTier } from "@/lib/reputation";
+import { REPUTATION_TIER_LABEL, type ReputationTier } from "@/lib/reputationTier";
 
 const TIER_CLASS: Record<Exclude<ReputationTier, "new">, string> = {
   builder: "text-text-dim",
