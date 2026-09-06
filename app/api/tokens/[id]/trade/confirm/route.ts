@@ -130,10 +130,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     [walletId, id, newHoldingAmount]
   );
 
-  const feeTotal = solAmount * 0.01;
+  // fee_bps mirrors exactly what the Rust program itself reads: buy()/sell() both capture
+  // curve.graduated *before* this trade mutates it (buy() may flip it to true mid-trade, but
+  // still prices that same trade at the pre-graduation rate — see lib.rs), so `wasGraduated`
+  // (this token's graduated flag going into this call) is the right rate selector here too.
+  //
+  // This used to be reconstructed as a flat "1% of solAmount", which is only correct for
+  // buys, where solAmount is the gross amount paid in. For sells, solAmount is the *net*
+  // payout the trader received — already fee-deducted — so "1% of that" silently understated
+  // every sell's recorded fee (and the creator/staker/treasury DB ledgers it feeds) by about
+  // 1% of itself. It also had no notion of the 0.25% post-graduation rate at all. Deriving
+  // fee_total from solAmount and the real fee_bps, then splitting it the same 40/40/20 way
+  // the program does, fixes both — correct for either side, before or after graduation.
+  //
+  // (Reading the fee straight off the transaction's balance deltas into the creator/staker/
+  // treasury accounts was tried and rejected: when the creator trades their own token — as
+  // happened on this app's very first real trade — `buyer` and `creator` are the same
+  // account, so Solana collapses them into one shared balance-delta slot that mixes the
+  // trade's principal with the fee credit and can't be pulled back apart.)
+  const feeBps = wasGraduated ? 25 : 100;
+  const feeTotal = side === "buy" ? solAmount * (feeBps / 10000) : solAmount * (feeBps / (10000 - feeBps));
   const feeCreator = feeTotal * 0.4;
   const feeStaker = feeTotal * 0.4;
-  const feeTreasury = feeTotal * 0.2;
+  const feeTreasury = feeTotal - feeCreator - feeStaker;
 
   await dbRun(
     db,
