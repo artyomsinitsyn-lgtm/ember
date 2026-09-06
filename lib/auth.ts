@@ -85,6 +85,17 @@ export async function getSessionWalletId(): Promise<string> {
   return YOU_WALLET_ID;
 }
 
+/** Read-only counterpart to getSessionWalletId: returns the wallet id already bound to
+ * the session cookie, or null — never provisions a demo session as a side effect. The
+ * client calls this (via /api/auth/session) to check "am I already signed in as this
+ * wallet" before asking it to sign a fresh nonce, since the cookie is HttpOnly and
+ * otherwise invisible to client JS. */
+export async function peekSessionWalletId(): Promise<string | null> {
+  const store = await cookies();
+  const existing = store.get(SESSION_COOKIE)?.value;
+  return existing ? verifyToken(existing) : null;
+}
+
 /** Upgrades the session to a specific wallet id — only ever called after verifySignature
  * confirms the caller controls that keypair. */
 export async function setSessionWalletId(walletId: string) {

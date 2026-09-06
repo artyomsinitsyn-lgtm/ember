@@ -4,8 +4,19 @@ import { useMemo } from "react";
 import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { WalletConnectWalletAdapter } from "@solana/wallet-adapter-walletconnect";
-import { WalletAdapterNetwork, type Adapter } from "@solana/wallet-adapter-base";
+import { WalletAdapterNetwork, type Adapter, type WalletError } from "@solana/wallet-adapter-base";
 import { SOLANA_RPC_URL } from "@/lib/onchain/program";
+
+// WalletProvider's default onError is a bare console.error for every adapter error,
+// including the routine "user closed the signature prompt" case — which then shows up
+// looking like a real crash (Next.js's dev overlay pretty-prints it with a code frame).
+// useConnectedWallet.ts already catches this outcome and handles it silently; this just
+// stops the adapter's own event-emitter copy of the same error from being logged as if
+// it were unexpected. Anything else still gets logged normally.
+function onWalletError(error: WalletError) {
+  if (error.name === "WalletSignMessageError" || /user rejected/i.test(error.message)) return;
+  console.error(error);
+}
 
 const WALLETCONNECT_PROJECT_ID = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
 
@@ -48,7 +59,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
+      <WalletProvider wallets={wallets} autoConnect onError={onWalletError}>
         <WalletModalProvider>{children}</WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>
