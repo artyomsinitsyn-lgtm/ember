@@ -4,7 +4,7 @@ use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Mint, MintTo, SetAuthority, Token, TokenAccount, Transfer};
 use anchor_spl::token::spl_token::instruction::AuthorityType;
 
-declare_id!("9brEDkea42QTp3dGT7jMWLE7pgnttHo5ZmyWDDPkzrbb");
+declare_id!("3M5QSpEo4s3r3HVuVwoQea9gojsuCzVP1DNbPpHW8Frr");
 
 // Mirrors lib/constants.ts exactly. Token amounts are raw units at DECIMALS; SOL amounts are
 // lamports. Pump.fun's real numbers (30 virtual SOL, 85 SOL graduation, 1.073B virtual token

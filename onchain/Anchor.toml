@@ -7,10 +7,10 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-alloy_curve = "9brEDkea42QTp3dGT7jMWLE7pgnttHo5ZmyWDDPkzrbb"
+alloy_curve = "3M5QSpEo4s3r3HVuVwoQea9gojsuCzVP1DNbPpHW8Frr"
 
 [programs.devnet]
-alloy_curve = "9brEDkea42QTp3dGT7jMWLE7pgnttHo5ZmyWDDPkzrbb"
+alloy_curve = "3M5QSpEo4s3r3HVuVwoQea9gojsuCzVP1DNbPpHW8Frr"
 
 [provider]
 # Devnet: current plan is demo/launch on devnet first (test SOL, no real funds at risk), so

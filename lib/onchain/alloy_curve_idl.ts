@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/alloy_curve.json`.
  */
 export type AlloyCurve = {
-  "address": "9brEDkea42QTp3dGT7jMWLE7pgnttHo5ZmyWDDPkzrbb",
+  "address": "3M5QSpEo4s3r3HVuVwoQea9gojsuCzVP1DNbPpHW8Frr",
   "metadata": {
     "name": "alloyCurve",
     "version": "0.1.0",
