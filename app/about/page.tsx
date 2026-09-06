@@ -5,7 +5,7 @@ import Link from "next/link";
 import HeroArt from "@/components/HeroArt";
 import RugRiskExplainer from "@/components/RugRiskExplainer";
 import StarburstBadge from "@/components/StarburstBadge";
-import { formatUsd, formatDuration } from "@/lib/format";
+import { formatSol, formatDuration } from "@/lib/format";
 import {
   STAKE_TICKER,
   TRADE_FEE_BPS,
@@ -36,7 +36,7 @@ const STEPS = [
   {
     n: "03",
     h: "Graduate",
-    p: `At $${GRADUATION_CORE_RAISED} raised the curve graduates — liquidity becomes a protocol-owned pool that keeps earning stakers fees, forever.`,
+    p: `At ${GRADUATION_CORE_RAISED} SOL raised the curve graduates — liquidity becomes a protocol-owned pool that keeps earning stakers fees, forever.`,
   },
 ];
 
@@ -87,7 +87,7 @@ export default function AboutPage() {
               <div className="alloy-stat-label">TOKENS LAUNCHED</div>
             </div>
             <div>
-              <div className="alloy-stat-value">{stats ? formatUsd(stats.lifetimeVolume) : "—"}</div>
+              <div className="alloy-stat-value">{stats ? formatSol(stats.lifetimeVolume) : "—"}</div>
               <div className="alloy-stat-label">LIFETIME VOLUME</div>
             </div>
             <div>
@@ -175,7 +175,7 @@ export default function AboutPage() {
             </h3>
             <p className="alloy-p" style={{ marginBottom: 0, maxWidth: 720 }}>
               Getting verified takes two things: a confirmed phone or email, and real trading history — at least{" "}
-              {formatUsd(VERIFIED_PROFIT_THRESHOLD)} in realized profit. Profit alone is trivial to fake with wash
+              {formatSol(VERIFIED_PROFIT_THRESHOLD)} in realized profit. Profit alone is trivial to fake with wash
               trades against yourself, and a confirmed contact alone doesn&apos;t prove much either, so both gates
               have to clear. It exists mostly to protect people, not to flex: verified wallets get a much higher
               weekly cap on outbound connection requests, and anyone can set their profile to only accept requests

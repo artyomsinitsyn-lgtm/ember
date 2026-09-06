@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
 import TokenIcon from "@/components/TokenIcon";
-import { formatUsd } from "@/lib/format";
+import { formatSol } from "@/lib/format";
 import type { SerializedToken } from "@/lib/serialize";
 
 interface ClusterFlag {
@@ -149,7 +149,7 @@ export default function RugRiskExplainer() {
                 ${token.ticker} <span className="text-text-dim" style={{ fontWeight: 400 }}>{token.name}</span>
               </div>
               <div className="alloy-card-sub">
-                MCAP {formatUsd(token.marketCap)} · top wallet holds{" "}
+                MCAP {formatSol(token.marketCap)} · top wallet holds{" "}
                 {assessment.topWalletPct.toFixed(1)}% of circulating supply
               </div>
             </div>

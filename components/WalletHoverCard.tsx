@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { BadgeCheck } from "lucide-react";
-import { formatCompact, formatUsd, timeAgo } from "@/lib/format";
+import { formatCompact, formatSol, timeAgo } from "@/lib/format";
 import { STAKE_TICKER } from "@/lib/constants";
 import type { WalletProfile } from "@/lib/profile";
 import TokenIcon from "./TokenIcon";
@@ -190,18 +190,18 @@ export default function WalletHoverCard({
                   </div>
                   <div className="grid grid-cols-2 gap-y-1.5 text-xs">
                     <span className="text-text-dim">Net Worth</span>
-                    <span className="mono text-right">{formatUsd(profile.netWorth)}</span>
+                    <span className="mono text-right">{formatSol(profile.netWorth)}</span>
 
                     <span className="text-text-dim">Net Trade P&L</span>
                     <span className={`mono text-right ${profile.realizedPnl >= 0 ? "text-up" : "text-down"}`}>
-                      {formatUsd(profile.realizedPnl, { showPlus: true })}
+                      {formatSol(profile.realizedPnl, { showPlus: true })}
                     </span>
 
                     <span className="text-text-dim">Buy Volume</span>
-                    <span className="mono text-right">{formatUsd(profile.buyVolume)}</span>
+                    <span className="mono text-right">{formatSol(profile.buyVolume)}</span>
 
                     <span className="text-text-dim">Sell Volume</span>
-                    <span className="mono text-right">{formatUsd(profile.sellVolume)}</span>
+                    <span className="mono text-right">{formatSol(profile.sellVolume)}</span>
 
                     <span className="text-text-dim">Tokens Created</span>
                     <span className="mono text-right">

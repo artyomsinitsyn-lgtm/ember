@@ -8,7 +8,7 @@ import BuySellPanel from "@/components/BuySellPanel";
 import ProgressBar from "@/components/ProgressBar";
 import PrismCard from "@/components/PrismCard";
 import TokenCallouts from "@/components/TokenCallouts";
-import { formatUsd, formatCompact, formatPrice, formatPct, timeAgo } from "@/lib/format";
+import { formatSol, formatCompact, formatPrice, formatPct, timeAgo } from "@/lib/format";
 import type { SerializedToken } from "@/lib/serialize";
 import type { RugAssessment } from "@/lib/rugDetection";
 import { GRADUATION_CORE_RAISED } from "@/lib/constants";
@@ -246,7 +246,7 @@ export default function TokenPageClient({ id }: { id: string }) {
           <div className="flex gap-6 mono text-right">
             <div>
               <div className="text-[10px] text-text-dim uppercase tracking-wide">Price</div>
-              <div className="font-medium tabular-nums">${formatPrice(token.price)}</div>
+              <div className="font-medium tabular-nums">{formatPrice(token.price)} SOL</div>
               {change && (
                 <div className={`text-xs tabular-nums ${change.pct >= 0 ? "text-up" : "text-down"}`}>
                   {change.pct >= 0 ? "+" : ""}
@@ -256,7 +256,7 @@ export default function TokenPageClient({ id }: { id: string }) {
             </div>
             <div>
               <div className="text-[10px] text-text-dim uppercase tracking-wide">Market Cap</div>
-              <div className="font-medium tabular-nums">{formatUsd(token.marketCap)}</div>
+              <div className="font-medium tabular-nums">{formatSol(token.marketCap)}</div>
             </div>
           </div>
           <ReportButton targetType="token" targetId={id} />
@@ -455,8 +455,8 @@ export default function TokenPageClient({ id }: { id: string }) {
             </div>
             <ProgressBar value={token.progress} graduated={token.graduated} />
             <div className="text-xs text-text-dim mt-2">
-              {formatUsd(token.realCoreRaised)} raised
-              {!token.graduated && ` · graduates at $${GRADUATION_CORE_RAISED}, liquidity becomes a protocol-owned pool`}
+              {formatSol(token.realCoreRaised)} raised
+              {!token.graduated && ` · graduates at ${GRADUATION_CORE_RAISED} SOL, liquidity becomes a protocol-owned pool`}
             </div>
           </PrismCard>
 
@@ -506,9 +506,9 @@ export default function TokenPageClient({ id }: { id: string }) {
                       <span className="text-text-dim truncate">{h.walletName}</span>
                     </WalletLink>
                   </span>
-                  <span className="mono text-right tabular-nums">{formatUsd(h.positionValue)}</span>
+                  <span className="mono text-right tabular-nums">{formatSol(h.positionValue)}</span>
                   <span className={`mono text-right tabular-nums ${h.netPnl >= 0 ? "text-up" : "text-down"}`}>
-                    {formatUsd(h.netPnl, { showPlus: true })}
+                    {formatSol(h.netPnl, { showPlus: true })}
                   </span>
                   <span className="mono text-right tabular-nums text-text-dim">{h.pctSupply.toFixed(2)}%</span>
                 </Fragment>

@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Docs | Alloy" };
 const SECTIONS = [
   {
     h: "Bonding curve",
-    p: `Every new token launches on a virtual AMM curve — the same shape pump.fun uses. Price moves purely off supply and demand from the first trade; there's no presale and no team allocation to seed. The curve graduates once it's raised $${GRADUATION_CORE_RAISED}, at which point liquidity migrates to a protocol-owned pool that keeps earning ${STAKE_TICKER} stakers fees, forever.`,
+    p: `Every new token launches on a virtual AMM curve — the same shape pump.fun uses. Price moves purely off supply and demand from the first trade; there's no presale and no team allocation to seed. The curve graduates once it's raised ${GRADUATION_CORE_RAISED} SOL, at which point liquidity migrates to a protocol-owned pool that keeps earning ${STAKE_TICKER} stakers fees, forever.`,
   },
   {
     h: "Fees",

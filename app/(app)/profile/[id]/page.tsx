@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getDb } from "@/lib/db";
 import { computeWalletProfile } from "@/lib/profile";
-import { formatUsd } from "@/lib/format";
+import { formatSol } from "@/lib/format";
 import ProfilePageClient from "@/components/ProfilePageClient";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -11,7 +11,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
   return {
     title: `${profile.name} | Alloy`,
-    description: `${profile.name}'s Alloy profile — ${formatUsd(profile.netWorth)} net worth, ${profile.tokensCreated} tokens launched.`,
+    description: `${profile.name}'s Alloy profile — ${formatSol(profile.netWorth)} net worth, ${profile.tokensCreated} tokens launched.`,
   };
 }
 

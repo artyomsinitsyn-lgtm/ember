@@ -6,7 +6,7 @@ import { PublicKey } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Landmark } from "lucide-react";
-import { formatUsd } from "@/lib/format";
+import { formatSol } from "@/lib/format";
 import { getProgram, LAMPORTS_PER_SOL } from "@/lib/onchain/program";
 import { fetchTreasuryState } from "@/lib/onchain/treasury";
 import { buildInitializeTreasuryConfigTx, buildSetTreasuryAdminTx, buildWithdrawTreasuryTx } from "@/lib/onchain/actions";
@@ -190,7 +190,7 @@ export default function TreasuryAdminPage() {
             <span className="text-2xl font-semibold mono">
               {isAdmin ? (
                 <>
-                  {balanceSol.toFixed(4)} SOL <span className="text-sm text-text-dim">{formatUsd(balanceSol)}</span>
+                  {balanceSol.toFixed(4)} SOL <span className="text-sm text-text-dim">{formatSol(balanceSol)}</span>
                 </>
               ) : (
                 <span className="text-text-dim">•••••</span>

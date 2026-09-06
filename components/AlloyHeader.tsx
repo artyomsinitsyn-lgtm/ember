@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Settings } from "lucide-react";
-import { formatCompact, formatUsd } from "@/lib/format";
+import { formatCompact, formatSol } from "@/lib/format";
 import { STAKE_TICKER } from "@/lib/constants";
 import { LAMPORTS_PER_SOL } from "@/lib/onchain/program";
 import { useConnectedWalletId } from "@/lib/useConnectedWallet";
@@ -145,7 +145,7 @@ export default function AlloyHeader() {
         {balances && (
           <div className="alloy-balance">
             <span>
-              <b>{connected && onchainSol !== null ? `${onchainSol.toFixed(3)} SOL` : formatUsd(balances.core)}</b>
+              <b>{connected && onchainSol !== null ? `${onchainSol.toFixed(3)} SOL` : formatSol(balances.core)}</b>
             </span>
             <span>
               <b>{formatCompact(balances.embr)}</b> {STAKE_TICKER}

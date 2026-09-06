@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { CreditCard, Landmark, Split } from "lucide-react";
-import { formatCompact, formatUsd, timeAgo } from "@/lib/format";
+import { formatCompact, formatSol, timeAgo } from "@/lib/format";
 import { CURRENCY_TICKER, STAKE_TICKER } from "@/lib/constants";
 import TokenIcon from "@/components/TokenIcon";
 import { useConnectedWalletId } from "@/lib/useConnectedWallet";
@@ -111,7 +111,7 @@ export default function WalletPage() {
         <div>
           <div className="alloy-kicker" style={{ marginBottom: 6 }}>SIMULATED BALANCES</div>
           <div className="alloy-stat-v" style={{ fontSize: 40 }}>
-            {formatUsd(portfolioValue)}
+            {formatSol(portfolioValue)}
           </div>
         </div>
         <div style={{ flex: 1 }} />
@@ -193,7 +193,7 @@ export default function WalletPage() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 14, marginBottom: 26 }}>
         <div className="alloy-stat-card">
           <div className="alloy-stat-k">{CURRENCY_TICKER} BALANCE</div>
-          <div className="alloy-stat-v">{formatUsd(coreBalance)}</div>
+          <div className="alloy-stat-v">{formatSol(coreBalance)}</div>
         </div>
         <div className="alloy-stat-card">
           <div className="alloy-stat-k">{STAKE_TICKER} BALANCE</div>
@@ -201,7 +201,7 @@ export default function WalletPage() {
         </div>
         <div className="alloy-stat-card">
           <div className="alloy-stat-k">HOLDINGS VALUE</div>
-          <div className="alloy-stat-v">{formatUsd(portfolioValue)}</div>
+          <div className="alloy-stat-v">{formatSol(portfolioValue)}</div>
         </div>
       </div>
 
@@ -224,7 +224,7 @@ export default function WalletPage() {
                 </div>
                 <div style={{ textAlign: "right", fontFamily: "var(--alloy-mono)" }}>
                   <div style={{ color: "var(--text)" }}>{formatCompact(h.amount)}</div>
-                  <div style={{ fontSize: 11, color: "color-mix(in srgb, var(--text) 45%, transparent)" }}>{formatUsd(h.value)}</div>
+                  <div style={{ fontSize: 11, color: "color-mix(in srgb, var(--text) 45%, transparent)" }}>{formatSol(h.value)}</div>
                 </div>
               </Link>
             ))
@@ -253,10 +253,10 @@ export default function WalletPage() {
                   </div>
                   <div style={{ fontFamily: "var(--alloy-mono)", fontSize: 11, color: "color-mix(in srgb, var(--text) 50%, transparent)", textAlign: "right" }}>
                     {h.kind === "trade"
-                      ? `${formatCompact(h.tokenAmount ?? 0)} @ ${formatUsd(h.coreAmount ?? 0)}`
+                      ? `${formatCompact(h.tokenAmount ?? 0)} @ ${formatSol(h.coreAmount ?? 0)}`
                       : h.kind === "stake"
                       ? `${formatCompact(h.amount ?? 0)} ${STAKE_TICKER}`
-                      : formatUsd(h.amount ?? 0)}
+                      : formatSol(h.amount ?? 0)}
                     <span style={{ marginLeft: 8 }}>{timeAgo(h.createdAt)}</span>
                   </div>
                 </div>

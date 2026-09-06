@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Pencil, ImagePlus, Loader2, ShieldCheck, BadgeCheck, Wallet2, Users, Copy, Check } from "lucide-react";
-import { formatCompact, formatUsd, timeAgo } from "@/lib/format";
+import { formatCompact, formatSol, timeAgo } from "@/lib/format";
 import { STAKE_TICKER, VERIFIED_PROFIT_THRESHOLD } from "@/lib/constants";
 import { REPUTATION_TIER_LABEL } from "@/lib/reputationTier";
 import type { WalletProfile } from "@/lib/profile";
@@ -125,19 +125,19 @@ function VerificationPanel({
 
       {profile.verified ? (
         <p className="text-xs text-up">
-          Verified — contact confirmed and net trade profit is above ${VERIFIED_PROFIT_THRESHOLD}.
+          Verified — contact confirmed and net trade profit is above {VERIFIED_PROFIT_THRESHOLD} SOL.
         </p>
       ) : (
         <>
           <p className="text-xs text-text-dim">
-            A verified badge needs both a confirmed contact and ${VERIFIED_PROFIT_THRESHOLD} of net trade profit —
+            A verified badge needs both a confirmed contact and {VERIFIED_PROFIT_THRESHOLD} SOL of net trade profit —
             profit alone is easy to fake by trading against yourself.
           </p>
 
           <div className="flex items-center justify-between text-xs">
             <span className="text-text-dim">Profit threshold</span>
             <span className="mono">
-              {formatUsd(Math.max(0, profile.realizedPnl))} / ${VERIFIED_PROFIT_THRESHOLD}
+              {formatSol(Math.max(0, profile.realizedPnl))} / {VERIFIED_PROFIT_THRESHOLD} SOL
             </span>
           </div>
           <div className="h-1.5 rounded-full bg-bg-elevated overflow-hidden">
@@ -306,7 +306,7 @@ function ActivityTab({ walletId }: { walletId: string }) {
             <span className="text-text-dim truncate">${t.ticker}</span>
           </div>
           <div className="mono text-text-dim shrink-0 tabular-nums">
-            {formatUsd(t.core_amount)} · {timeAgo(t.created_at)}
+            {formatSol(t.core_amount)} · {timeAgo(t.created_at)}
           </div>
         </Link>
       ))}
@@ -789,15 +789,15 @@ export default function ProfilePageClient({ id }: { id: string }) {
       </button>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <Stat label="Net Worth" value={formatUsd(profile.netWorth)} />
+        <Stat label="Net Worth" value={formatSol(profile.netWorth)} />
         <Stat
           label="Net Trade P&L"
-          value={formatUsd(profile.realizedPnl, { showPlus: true })}
+          value={formatSol(profile.realizedPnl, { showPlus: true })}
           accent={profile.realizedPnl >= 0 ? "text-up" : "text-down"}
         />
-        <Stat label="Buy Volume" value={formatUsd(profile.buyVolume)} />
-        <Stat label="Sell Volume" value={formatUsd(profile.sellVolume)} />
-        <Stat label="Portfolio Value" value={formatUsd(profile.portfolioValue)} />
+        <Stat label="Buy Volume" value={formatSol(profile.buyVolume)} />
+        <Stat label="Sell Volume" value={formatSol(profile.sellVolume)} />
+        <Stat label="Portfolio Value" value={formatSol(profile.portfolioValue)} />
         <Stat label="Trades Made" value={String(profile.tradeCount)} />
         <Stat
           label="Tokens Created"
@@ -808,7 +808,7 @@ export default function ProfilePageClient({ id }: { id: string }) {
           }
         />
         <Stat label={`${STAKE_TICKER} Staked`} value={formatCompact(profile.staked)} />
-        <Stat label={`${STAKE_TICKER} Rewards Claimed`} value={formatUsd(profile.lifetimeClaimed)} />
+        <Stat label={`${STAKE_TICKER} Rewards Claimed`} value={formatSol(profile.lifetimeClaimed)} />
         {profile.reputationTier !== "new" && (
           <Stat
             label="Creator Reputation"

@@ -4,12 +4,15 @@ export function formatCore(n: number): string {
   return n.toFixed(6);
 }
 
-/** Compact amount with a leading "$" instead of a trailing ticker — USD is this
- * platform's unit of account, so it reads like real money throughout the UI ("+$1.2K",
- * "$430") instead of "1.2K USD". Sign goes before the $, matching that convention. */
-export function formatUsd(n: number, opts?: { showPlus?: boolean }): string {
+/** Compact amount with a trailing "SOL" — every one of these figures is real SOL moved
+ * 1:1 on-chain (see submitOnchain in BuySellPanel.tsx), so the label has to say so
+ * honestly instead of implying USD with a "$" prefix, which is exactly the kind of
+ * mislabeling that risks someone spending far more real money than they intend once
+ * this runs with live funds (SOL trades well above $1). A live SOL->USD price feed can
+ * add a secondary "≈ $X" figure later, but only alongside this, never in place of it. */
+export function formatSol(n: number, opts?: { showPlus?: boolean }): string {
   const sign = n < 0 ? "-" : opts?.showPlus && n > 0 ? "+" : "";
-  return `${sign}$${formatCompact(Math.abs(n))}`;
+  return `${sign}${formatCompact(Math.abs(n))} SOL`;
 }
 
 export function formatCompact(n: number): string {

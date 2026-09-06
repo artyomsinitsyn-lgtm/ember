@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ShieldAlert } from "lucide-react";
 import TokenIcon from "@/components/TokenIcon";
-import { formatUsd } from "@/lib/format";
+import { formatSol } from "@/lib/format";
 import type { WalletPosition } from "@/lib/positions";
 
 /** One position row (open, closed, or ranked "top trade") — shared by a profile's tabbed
@@ -30,13 +30,13 @@ export default function PositionRow({ position, rank }: { position: WalletPositi
       </div>
       <div className="mono text-right text-xs shrink-0">
         <div className="text-text-dim">
-          Position <span className="text-text">{open ? formatUsd(positionValue) : "Closed"}</span>
+          Position <span className="text-text">{open ? formatSol(positionValue) : "Closed"}</span>
         </div>
-        <div className={netPnl >= 0 ? "text-up" : "text-down"}>Net PNL {formatUsd(netPnl, { showPlus: true })}</div>
+        <div className={netPnl >= 0 ? "text-up" : "text-down"}>Net PNL {formatSol(netPnl, { showPlus: true })}</div>
         {spent > 0 && (
           <div className="text-text-dim">
-            Spent {formatUsd(spent)}
-            {avgEntryMcap != null ? ` · ${formatUsd(avgEntryMcap)} MC avg` : ""}
+            Spent {formatSol(spent)}
+            {avgEntryMcap != null ? ` · ${formatSol(avgEntryMcap)} MC avg` : ""}
           </div>
         )}
       </div>

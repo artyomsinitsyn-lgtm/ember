@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { ShieldQuestion } from "lucide-react";
 import AreaChart, { type AreaPoint } from "@/components/AreaChart";
-import { formatCompact, formatUsd, formatPct } from "@/lib/format";
+import { formatCompact, formatSol, formatPct } from "@/lib/format";
 import { CURRENCY_TICKER, STAKE_TICKER, TRADE_FEE_BPS, FEE_SPLIT, BPS_DENOM } from "@/lib/constants";
 import { useConnectedWalletId } from "@/lib/useConnectedWallet";
 
@@ -129,7 +129,7 @@ export default function StakePage() {
 
   const STATS = [
     { k: "TOTAL STAKED", v: `${formatCompact(poolTotalStaked)} ${STAKE_TICKER}` },
-    { k: "LIFETIME DISTRIBUTED", v: formatUsd(lifetimeDistributed) },
+    { k: "LIFETIME DISTRIBUTED", v: formatSol(lifetimeDistributed) },
     { k: "YOUR SHARE", v: `${(yourShare * 100).toFixed(2)}%` },
   ];
 
@@ -140,7 +140,7 @@ export default function StakePage() {
   const PLATFORM_STATS = [
     { k: "% OF SUPPLY STAKED", v: stats ? formatPct(stats.pctStaked) : "—" },
     { k: "STAKERS", v: stats ? String(stats.stakerCount) : "—" },
-    { k: "TOTAL VOLUME", v: stats ? formatUsd(stats.totalVolume) : "—" },
+    { k: "TOTAL VOLUME", v: stats ? formatSol(stats.totalVolume) : "—" },
     { k: "TOTAL TRADES", v: stats ? String(stats.totalTrades) : "—" },
   ];
 
@@ -269,11 +269,11 @@ export default function StakePage() {
             </div>
             <div className="alloy-row">
               <span className="alloy-row-k">Pending rewards</span>
-              <span className="alloy-row-v" style={{ color: "#8bc3ab" }}>{formatUsd(pendingCore)}</span>
+              <span className="alloy-row-v" style={{ color: "#8bc3ab" }}>{formatSol(pendingCore)}</span>
             </div>
             <div className="alloy-row">
               <span className="alloy-row-k">Lifetime claimed</span>
-              <span className="alloy-row-v">{formatUsd(claimedCore)}</span>
+              <span className="alloy-row-v">{formatSol(claimedCore)}</span>
             </div>
           </div>
 
@@ -370,15 +370,15 @@ export default function StakePage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14 }}>
           <div className="alloy-stat-card">
             <div className="alloy-stat-k">DAILY POOL TO ALL STAKERS</div>
-            <div className="alloy-stat-v">{formatUsd(calc.dailyToStakers)}</div>
+            <div className="alloy-stat-v">{formatSol(calc.dailyToStakers)}</div>
           </div>
           <div className="alloy-stat-card">
             <div className="alloy-stat-k">YOUR EST. DAILY EARNINGS</div>
-            <div className="alloy-stat-v up">{formatUsd(calc.dailyEarnings)}</div>
+            <div className="alloy-stat-v up">{formatSol(calc.dailyEarnings)}</div>
           </div>
           <div className="alloy-stat-card">
             <div className="alloy-stat-k">YOUR EST. ANNUAL EARNINGS</div>
-            <div className="alloy-stat-v up">{formatUsd(calc.annualEarnings)}</div>
+            <div className="alloy-stat-v up">{formatSol(calc.annualEarnings)}</div>
           </div>
         </div>
         <p style={{ fontFamily: "var(--alloy-mono)", fontSize: 10, color: "color-mix(in srgb, var(--text) 40%, transparent)", marginTop: 16 }}>
@@ -413,9 +413,9 @@ export default function StakePage() {
             >
               <span>{new Date(d.timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
               <span style={{ textAlign: "right" }}>{d.trades}</span>
-              <span style={{ textAlign: "right" }}>{formatUsd(d.volume)}</span>
-              <span style={{ textAlign: "right", color: "#8bc3ab" }}>{formatUsd(d.stakerFees)}</span>
-              <span style={{ textAlign: "right" }}>{formatUsd(d.creatorFees)}</span>
+              <span style={{ textAlign: "right" }}>{formatSol(d.volume)}</span>
+              <span style={{ textAlign: "right", color: "#8bc3ab" }}>{formatSol(d.stakerFees)}</span>
+              <span style={{ textAlign: "right" }}>{formatSol(d.creatorFees)}</span>
             </div>
           ))
         )}

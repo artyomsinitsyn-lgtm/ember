@@ -1,5 +1,5 @@
 import { ShieldAlert, ShieldCheck } from "lucide-react";
-import { formatUsd, formatCompact, formatPct } from "@/lib/format";
+import { formatSol, formatCompact, formatPct } from "@/lib/format";
 import { TOTAL_SUPPLY } from "@/lib/constants";
 import type { RugAssessment } from "@/lib/rugDetection";
 
@@ -58,7 +58,7 @@ export default function TokenTransparencyPanel({
         </div>
         <div>
           <div className="text-text-dim">{graduated ? "Pool Liquidity" : "Curve Liquidity"}</div>
-          <div className="mono mt-0.5">{formatUsd(liquidity)}</div>
+          <div className="mono mt-0.5">{formatSol(liquidity)}</div>
         </div>
         <div>
           <div className="text-text-dim">Creator Allocation</div>

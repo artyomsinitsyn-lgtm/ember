@@ -7,7 +7,7 @@ import WalletHoverCard from "@/components/WalletHoverCard";
 import WalletLink from "@/components/WalletLink";
 import TokenIcon from "@/components/TokenIcon";
 import { useConnectedWalletId } from "@/lib/useConnectedWallet";
-import { formatCompact, formatUsd, timeAgo } from "@/lib/format";
+import { formatCompact, formatSol, timeAgo } from "@/lib/format";
 import { STAKE_TICKER } from "@/lib/constants";
 import type { WalletProfile } from "@/lib/profile";
 
@@ -182,7 +182,7 @@ export default function ConnectPage() {
           <div style={{ flex: 1 }} />
           <div style={{ display: "flex", gap: 26, flexWrap: "wrap" }}>
             <div>
-              <div className="alloy-stat-v" style={{ fontSize: 20 }}>{formatUsd(me.netWorth)}</div>
+              <div className="alloy-stat-v" style={{ fontSize: 20 }}>{formatSol(me.netWorth)}</div>
               <div className="alloy-stat-k">NET WORTH</div>
             </div>
             <div>
@@ -316,7 +316,7 @@ export default function ConnectPage() {
                     )}
                   </span>
                   <span style={{ fontFamily: "var(--alloy-mono)", fontSize: 13, textAlign: "right", color: "var(--text)" }}>
-                    {formatUsd(w.netWorth)}
+                    {formatSol(w.netWorth)}
                   </span>
                   <span style={{ fontFamily: "var(--alloy-mono)", fontSize: 13, textAlign: "right", color: "var(--text)" }}>
                     {formatCompact(w.staked)}

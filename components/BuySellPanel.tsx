@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { formatCompact, formatUsd } from "@/lib/format";
+import { formatCompact, formatSol } from "@/lib/format";
 import { CURRENCY_TICKER, STAKE_TICKER } from "@/lib/constants";
 import { getProgram, LAMPORTS_PER_SOL, TOKEN_UNIT, SOLANA_RPC_URL } from "@/lib/onchain/program";
 import { buildBuyTx, buildSellTx } from "@/lib/onchain/actions";
@@ -257,7 +257,7 @@ export default function BuySellPanel({
       return;
     }
     if (side === "buy" && availableForBuy !== null && value > availableForBuy) {
-      setError(`You only have ${formatUsd(availableForBuy)} available`);
+      setError(`You only have ${formatSol(availableForBuy)} available`);
       return;
     }
     setPending(true);
@@ -340,7 +340,7 @@ export default function BuySellPanel({
         <span className="mono tabular-nums">
           {formatCompact(tokenBalance)} {ticker}
           {holdingValue !== null && holdingValue > 0 && (
-            <span className="text-text-dim"> · {formatUsd(holdingValue)}</span>
+            <span className="text-text-dim"> · {formatSol(holdingValue)}</span>
           )}
         </span>
       </div>
@@ -351,7 +351,7 @@ export default function BuySellPanel({
           <span>
             {side === "buy"
               ? availableForBuy !== null
-                ? `${formatUsd(availableForBuy)} available`
+                ? `${formatSol(availableForBuy)} available`
                 : "Connect a wallet"
               : `${formatCompact(tokenBalance)} ${ticker} available`}
           </span>
@@ -396,7 +396,7 @@ export default function BuySellPanel({
                   {side === "buy" && "tokensOut" in quote
                     ? `${formatCompact(quote.tokensOut)} ${ticker}`
                     : "coreOutNet" in quote
-                      ? formatUsd(quote.coreOutNet)
+                      ? formatSol(quote.coreOutNet)
                       : "—"}
                 </span>
               </div>
@@ -415,7 +415,7 @@ export default function BuySellPanel({
                   {side === "buy" && "tokensOut" in quote
                     ? `${formatCompact(quote.tokensOut * (1 - slippagePct / 100))} ${ticker}`
                     : "coreOutNet" in quote
-                      ? formatUsd(quote.coreOutNet * (1 - slippagePct / 100))
+                      ? formatSol(quote.coreOutNet * (1 - slippagePct / 100))
                       : "—"}
                 </span>
               </div>

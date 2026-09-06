@@ -5,7 +5,7 @@ import { ShieldAlert } from "lucide-react";
 import PrismCard from "@/components/PrismCard";
 import TokenIcon from "@/components/TokenIcon";
 import GraduatedChip from "@/components/GraduatedChip";
-import { formatUsd, timeAgoShort } from "@/lib/format";
+import { formatSol, timeAgoShort } from "@/lib/format";
 import type { SerializedToken } from "@/lib/serialize";
 
 /** A single coin row with the pointer-tracked holo/tilt hover (via PrismCard) — shared by
@@ -32,7 +32,7 @@ export default function CoinListRow({ token }: { token: SerializedToken }) {
           </div>
         </div>
         <div style={{ textAlign: "right", flex: "none" }}>
-          <div className="alloy-trend-mcap">{formatUsd(token.marketCap)}</div>
+          <div className="alloy-trend-mcap">{formatSol(token.marketCap)}</div>
           {token.graduated ? (
             <div style={{ marginTop: 4, display: "flex", justifyContent: "flex-end" }}>
               <GraduatedChip />

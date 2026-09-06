@@ -7,7 +7,7 @@ import WalletLink from "@/components/WalletLink";
 import PrismCard from "@/components/PrismCard";
 import TokenIcon from "@/components/TokenIcon";
 import GraduatedChip from "@/components/GraduatedChip";
-import { formatUsd, timeAgoShort } from "@/lib/format";
+import { formatSol, timeAgoShort } from "@/lib/format";
 import type { WalletProfile } from "@/lib/profile";
 import type { SerializedToken } from "@/lib/serialize";
 
@@ -31,10 +31,10 @@ function PersonRow({ r, rank, primary }: { r: WalletProfile; rank: number; prima
         <span className="alloy-pnl-name">{r.name}</span>
         <span style={{ textAlign: "right", flex: "none" }}>
           <span className={`alloy-pnl-value ${r.realizedPnl >= 0 ? "up" : "down"}`} style={{ fontWeight: primary === "pnl" ? 700 : 500 }}>
-            {formatUsd(r.realizedPnl, { showPlus: true })}
+            {formatSol(r.realizedPnl, { showPlus: true })}
           </span>
           <div className="alloy-trend-sub" style={{ marginTop: 2, fontWeight: primary === "earners" ? 700 : 400, color: primary === "earners" ? "color-mix(in srgb, var(--text) 75%, transparent)" : undefined }}>
-            {formatUsd(r.netWorth)}
+            {formatSol(r.netWorth)}
           </div>
         </span>
       </PrismCard>
@@ -58,7 +58,7 @@ function TokenRow({ t }: { t: SerializedToken }) {
         {t.graduated && <GraduatedChip />}
         <span style={{ textAlign: "right", flex: "none" }}>
           <div className="alloy-pnl-value" style={{ fontWeight: 600 }}>
-            {formatUsd(t.marketCap)}
+            {formatSol(t.marketCap)}
           </div>
         </span>
         {t.creatorVerified && (

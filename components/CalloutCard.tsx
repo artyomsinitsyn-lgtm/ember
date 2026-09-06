@@ -5,7 +5,7 @@ import Link from "next/link";
 import { BadgeCheck, Heart, MessageCircle, Loader2 } from "lucide-react";
 import TokenIcon from "@/components/TokenIcon";
 import ReportButton from "@/components/ReportButton";
-import { formatUsd, timeAgo } from "@/lib/format";
+import { formatSol, timeAgo } from "@/lib/format";
 import type { SerializedToken } from "@/lib/serialize";
 
 export interface FeedPost {
@@ -169,7 +169,7 @@ export default function CalloutCard({ post, showToken = true }: { post: FeedPost
           </span>
           <span style={{ minWidth: 0 }}>
             <span className="alloy-callout-token-name">${post.token.ticker}</span>
-            <span className="alloy-callout-token-sub">MCAP {formatUsd(post.token.marketCap)}</span>
+            <span className="alloy-callout-token-sub">MCAP {formatSol(post.token.marketCap)}</span>
           </span>
         </Link>
       )}

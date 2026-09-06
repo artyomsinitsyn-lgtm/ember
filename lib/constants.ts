@@ -38,6 +38,13 @@ export const CHALLENGE_ELIGIBILITY_HOURS = 72;
 
 // Display tickers. Internal fields/vars (core_balance, coreAmount, vCore, embr_balance,
 // etc.) stay as-is — these are purely what gets rendered to users, one place to rename.
-export const CURRENCY_TICKER = "USD";
+//
+// This used to be "USD", but every "core" amount here is actually real SOL moved 1:1
+// on-chain (see submitOnchain in BuySellPanel.tsx) — labeling it USD was a real risk of
+// someone spending far more real money than intended the moment this runs with live
+// funds, since SOL trades well above $1. The label must say what's actually moving; a
+// live SOL->USD price feed for a secondary "≈ $X" display can come later, but only ever
+// as an addition alongside the honest SOL figure, never as the only label.
+export const CURRENCY_TICKER = "SOL";
 export const STAKE_TICKER = "ALLOY";
 

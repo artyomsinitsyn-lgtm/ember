@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Search, X } from "lucide-react";
 import TokenIcon from "@/components/TokenIcon";
-import { formatUsd } from "@/lib/format";
+import { formatSol } from "@/lib/format";
 import type { SerializedToken } from "@/lib/serialize";
 
 interface WalletResult {
@@ -108,7 +108,7 @@ export default function SiteSearch() {
                         <div className="alloy-search-row-title">${t.ticker}</div>
                         <div className="alloy-search-row-sub">{t.name}</div>
                       </span>
-                      <span className="alloy-search-row-meta">{formatUsd(t.marketCap)}</span>
+                      <span className="alloy-search-row-meta">{formatSol(t.marketCap)}</span>
                     </Link>
                   ))}
                 </div>

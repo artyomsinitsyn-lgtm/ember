@@ -9,7 +9,7 @@ import PrismCard from "./PrismCard";
 import TypeChip from "./TypeChip";
 import ReputationBadge from "./ReputationBadge";
 import GraduatedChip from "./GraduatedChip";
-import { formatUsd, formatPrice, formatPct, timeAgo } from "@/lib/format";
+import { formatSol, formatPrice, formatPct, timeAgo } from "@/lib/format";
 import type { SerializedToken } from "@/lib/serialize";
 
 export default function TokenCard({ token }: { token: SerializedToken }) {
@@ -55,11 +55,11 @@ export default function TokenCard({ token }: { token: SerializedToken }) {
       <div className="flex items-end justify-between mono">
         <div>
           <div className="text-[10px] text-text-dim uppercase tracking-wide">Market Cap</div>
-          <div className="text-sm font-medium">{formatUsd(token.marketCap)}</div>
+          <div className="text-sm font-medium">{formatSol(token.marketCap)}</div>
         </div>
         <div className="text-right">
           <div className="text-[10px] text-text-dim uppercase tracking-wide">Price</div>
-          <div className="text-sm font-medium">${formatPrice(token.price)}</div>
+          <div className="text-sm font-medium">{formatPrice(token.price)} SOL</div>
         </div>
       </div>
 
